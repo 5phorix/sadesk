@@ -1,0 +1,296 @@
+import React, { useState } from 'react';
+import { supabase } from '@/api/supabaseClient';
+import { base44 } from '@/api/base44Client';
+import { useUser } from '@/components/hooks/useUser';
+import { useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Upload, FileText, Loader2, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+
+export default function BankStatementImport() {
+  const { user } = useUser();
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [bankAccount, setBankAccount] = useState('512000');
+  const queryClient = useQueryClient();
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      setPreview(null);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!file) return;
+
+    setLoading(true);
+    try {
+      const filePath = `${user.active_company_id}/${crypto.randomUUID()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file, { upsert: false });
+      if (uploadError) throw uploadError;
+      const { data: fileData } = supabase.storage.from('documents').getPublicUrl(filePath);
+      const file_url = fileData.publicUrl;
+
+      // Prompt professionnel pour relevé bancaire
+      const bankPrompt = `Tu es un expert-comptable. Analyse ce relevé bancaire avec PRÉCISION PROFESSIONNELLE.
+
+═══════════════════════════════════════════════════
+INSTRUCTIONS D'EXTRACTION - RELEVÉ BANCAIRE
+═══════════════════════════════════════════════════
+
+Pour CHAQUE transaction du relevé, extrait:
+
+→ transaction_date: Date de la transaction (format YYYY-MM-DD)
+   Mots-clés: "Date", "Date opération", "Date transaction"
+
+→ value_date: Date de valeur (format YYYY-MM-DD)
+   Mots-clés: "Date valeur", "Date comptable"
+   Si absente: utilise transaction_date
+
+→ description: Libellé complet de l'opération
+   Mots-clés: "Libellé", "Description", "Intitulé", "Opération"
+   Copie le texte complet tel quel
+
+→ reference: Référence bancaire unique
+   Mots-clés: "Référence", "Réf", "N° opération"
+   Si absente: laisser vide ""
+
+→ amount: Montant (NOMBRE décimal avec 2 décimales)
+   - POSITIF pour les CRÉDITS (entrées d'argent)
+   - NÉGATIF pour les DÉBITS (sorties d'argent)
+   Colonnes possibles: "Débit", "Crédit", "Montant"
+   ⚠️ Respecter le signe (+/-)
+
+→ balance_after: Solde après opération (si présent)
+   Mots-clés: "Solde", "Balance", "Solde après opération"
+   Si absent: mettre 0
+
+═══════════════════════════════════════════════════
+RÈGLES TECHNIQUES
+═══════════════════════════════════════════════════
+✓ Extraire TOUTES les transactions visibles
+✓ Dates au format YYYY-MM-DD strict
+✓ Montants: nombres décimaux (2 décimales)
+✓ Respecter le signe des montants (+ crédit, - débit)
+✓ Ne pas ignorer les petites transactions
+✓ Ignorer les lignes d'en-tête et de total`;
+
+      const extractedData = await base44.integrations.Core.InvokeLLM({
+        prompt: bankPrompt,
+        file_urls: [file_url],
+        response_json_schema: {
+          type: 'object',
+          properties: {
+            transactions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  transaction_date: { type: 'string' },
+                  value_date: { type: 'string' },
+                  description: { type: 'string' },
+                  reference: { type: 'string' },
+                  amount: { type: 'number' },
+                  balance_after: { type: 'number' }
+                },
+                required: ['transaction_date', 'description', 'amount']
+              }
+            }
+          },
+          required: ['transactions']
+        }
+      });
+
+      if (extractedData && extractedData.transactions) {
+        // Validation et normalisation professionnelle
+        const validatedTransactions = extractedData.transactions.map(t => ({
+          transaction_date: t.transaction_date || format(new Date(), 'yyyy-MM-dd'),
+          value_date: t.value_date || t.transaction_date || format(new Date(), 'yyyy-MM-dd'),
+          description: (t.description || 'Transaction bancaire').trim(),
+          reference: (t.reference || '').trim(),
+          amount: Math.round((parseFloat(t.amount) || 0) * 100) / 100,
+          balance_after: Math.round((parseFloat(t.balance_after) || 0) * 100) / 100
+        }));
+
+        setPreview(validatedTransactions);
+        toast.success(`${validatedTransactions.length} transactions extraites et validées`);
+      } else {
+        toast.error('Aucune transaction trouvée dans le fichier');
+      }
+    } catch (error) {
+      toast.error('Erreur lors de l\'import du fichier');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!preview || preview.length === 0) return;
+
+    setLoading(true);
+    try {
+      const transactions = preview.map((transaction) => ({
+          company_id: user.active_company_id,
+          bank_account: bankAccount,
+          transaction_date: transaction.transaction_date || format(new Date(), 'yyyy-MM-dd'),
+          value_date: transaction.value_date || transaction.transaction_date,
+          description: transaction.description || 'Transaction bancaire',
+          reference: transaction.reference || '',
+          amount: parseFloat(transaction.amount) || 0,
+          balance_after: parseFloat(transaction.balance_after) || 0,
+          is_reconciled: false
+      }));
+      const { error } = await supabase.from('bank_transactions').insert(transactions);
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['bankTransactions'] });
+      toast.success(`${preview.length} transactions importées`);
+      setFile(null);
+      setPreview(null);
+    } catch (error) {
+      toast.error('Erreur lors de l\'import des transactions');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Importer un relevé bancaire
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Compte bancaire</Label>
+            <Input
+              value={bankAccount}
+              onChange={(e) => setBankAccount(e.target.value)}
+              placeholder="512000"
+            />
+          </div>
+
+          <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-slate-300 transition-colors">
+            <input
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              onChange={handleFileChange}
+              className="hidden"
+              id="statement-upload"
+            />
+            <label htmlFor="statement-upload" className="cursor-pointer">
+              <FileText className="h-12 w-12 mx-auto text-slate-400 mb-4" />
+              <p className="text-sm text-slate-600 mb-2">
+                Cliquez pour importer un relevé bancaire
+              </p>
+              <p className="text-xs text-slate-400">
+                Formats acceptés : CSV, Excel
+              </p>
+            </label>
+          </div>
+
+          {file && (
+            <div className="space-y-2">
+              <p className="text-sm text-slate-600">
+                Fichier sélectionné : <span className="font-medium">{file.name}</span>
+              </p>
+              <Button
+                onClick={handleImport}
+                disabled={loading}
+                className="w-full"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Analyse en cours...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Analyser le fichier
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5" />
+            Aperçu des transactions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!preview ? (
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 mx-auto text-slate-300 mb-4" />
+              <p className="text-sm text-slate-400">
+                L'aperçu des transactions apparaîtra ici
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="max-h-96 overflow-y-auto border border-slate-200 rounded-lg">
+                {preview.slice(0, 10).map((transaction, idx) => (
+                  <div 
+                    key={idx}
+                    className="p-3 border-b border-slate-100 last:border-0 text-sm"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium text-slate-800">{transaction.description}</p>
+                        <p className="text-xs text-slate-500">{transaction.transaction_date}</p>
+                      </div>
+                      <p className={`font-semibold ${transaction.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {transaction.amount?.toFixed(2)} €
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {preview.length > 10 && (
+                <p className="text-xs text-slate-500 text-center">
+                  ... et {preview.length - 10} autres transactions
+                </p>
+              )}
+              <Button
+                onClick={handleConfirmImport}
+                disabled={loading}
+                className="w-full bg-emerald-600 hover:bg-emerald-700"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Import en cours...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Confirmer l'import ({preview.length} transactions)
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
