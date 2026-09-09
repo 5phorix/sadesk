@@ -22,13 +22,12 @@ import {
   Camera,
   Search,
   TrendingUp,
+  Waves,
   Target,
   Package,
   FolderOpen,
   Globe,
   LogOut,
-  RefreshCw,
-  Crown,
   Shield,
   Bell,
   CheckCircle2
@@ -67,13 +66,6 @@ const navSections = [
       { name: 'Suivi budgétaire', icon: Target, page: 'BudgetTracking' },
       { name: 'États Financiers', icon: FileText, page: 'FinancialStatements' },
       { name: 'Analytique', icon: Target, page: 'AnalyticalAccounting' },
-    ]
-  },
-  {
-    title: 'Gestion des Abonnements',
-    items: [
-      { name: 'Abonnements', icon: RefreshCw, page: 'SubscriptionManagement' },
-      { name: 'Abonnement', icon: Crown, page: 'SubscriptionPlans' },
     ]
   },
   {
@@ -117,6 +109,7 @@ const navSections = [
     title: 'Gestion Financière',
     items: [
       { name: 'Gestion Financière', icon: TrendingUp, page: 'FinancialManagement' },
+      { name: 'Prévision de trésorerie', icon: Waves, page: 'CashForecast' },
     ]
   },
   {

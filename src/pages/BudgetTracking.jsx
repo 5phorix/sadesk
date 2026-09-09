@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import {
   Plus,
@@ -16,7 +17,9 @@ import {
   AlertCircle,
   Edit,
   Trash2,
-  BarChart3
+  BarChart3,
+  Gauge,
+  WalletCards
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -44,6 +47,7 @@ export default function BudgetTracking() {
   const [showForm, setShowForm] = useState(false);
   const [selectedBudget, setSelectedBudget] = useState(null);
   const [deleteBudget, setDeleteBudget] = useState(null);
+  const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()));
   const queryClient = useQueryClient();
 
   const { data: budgets = [] } = useQuery({
@@ -66,6 +70,16 @@ export default function BudgetTracking() {
     enabled: !!user?.active_company_id,
   });
 
+  const { data: costCenters = [] } = useQuery({
+    queryKey: ['cost-centers', user?.active_company_id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('cost_centers').select('code, name').eq('company_id', user.active_company_id).order('code');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.active_company_id,
+  });
+
   const handleDelete = async () => {
     if (deleteBudget) {
       const { error } = await supabase.from('budgets').delete().eq('id', deleteBudget.id);
@@ -78,7 +92,7 @@ export default function BudgetTracking() {
 
   // Calcul des réalisations par budget
   const budgetAnalysis = useMemo(() => {
-    return budgets.map(budget => {
+    return budgets.filter(budget => !budget.fiscal_year || String(budget.fiscal_year) === selectedYear).map(budget => {
       let realized = 0;
       
       // Filtrer les écritures selon le budget
@@ -112,14 +126,16 @@ export default function BudgetTracking() {
         status
       };
     });
-  }, [budgets, entries]);
+  }, [budgets, entries, selectedYear]);
 
   const stats = useMemo(() => {
     const totalBudget = budgetAnalysis.reduce((sum, b) => sum + (parseFloat(b.total_amount) || 0), 0);
     const totalRealized = budgetAnalysis.reduce((sum, b) => sum + b.realized, 0);
     const alertCount = budgetAnalysis.filter(b => b.status === 'alert').length;
+    const overrun = budgetAnalysis.reduce((sum, b) => sum + Math.max(0, -b.remaining), 0);
+    const executionRate = totalBudget > 0 ? (totalRealized / totalBudget) * 100 : 0;
     
-    return { totalBudget, totalRealized, alertCount };
+    return { totalBudget, totalRealized, alertCount, overrun, executionRate };
   }, [budgetAnalysis]);
 
   // Données pour le graphique
@@ -140,17 +156,22 @@ export default function BudgetTracking() {
       <div className="space-y-6">
         <PageHeader
           title="Suivi budgétaire"
-          subtitle="Suivez et analysez vos budgets en temps réel"
+          subtitle="Mesurez les écarts entre vos ambitions et le réalisé"
           actions={
-            <Button onClick={() => { setSelectedBudget(null); setShowForm(true); }} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nouveau budget
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger className="w-[130px] bg-white"><SelectValue /></SelectTrigger>
+                <SelectContent>{[0, 1, 2].map(offset => { const year = String(new Date().getFullYear() - offset); return <SelectItem key={year} value={year}>{year}</SelectItem>; })}</SelectContent>
+              </Select>
+              <Button onClick={() => { setSelectedBudget(null); setShowForm(true); }} className="gap-2">
+                <Plus className="h-4 w-4" /> Nouveau budget
+              </Button>
+            </div>
           }
         />
 
         {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
@@ -161,6 +182,24 @@ export default function BudgetTracking() {
                   <div className="text-sm text-slate-500">Budget total</div>
                   <AmountDisplay amount={stats.totalBudget} size="lg" />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-cyan-100 rounded-lg"><Gauge className="h-5 w-5 text-cyan-700" /></div>
+                <div><div className="text-sm text-slate-500">Taux d'exécution</div><div className="text-2xl font-bold">{stats.executionRate.toFixed(1)}%</div></div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-rose-100 rounded-lg"><WalletCards className="h-5 w-5 text-rose-600" /></div>
+                <div><div className="text-sm text-slate-500">Dépassements</div><AmountDisplay amount={stats.overrun} size="lg" className="text-rose-700" /></div>
               </div>
             </CardContent>
           </Card>
@@ -193,6 +232,15 @@ export default function BudgetTracking() {
             </CardContent>
           </Card>
         </div>
+
+        {costCenters.length > 0 && (
+          <Card className="border-slate-200">
+            <CardHeader><CardTitle className="text-base">Centres de coûts disponibles</CardTitle></CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              {costCenters.map(center => <Badge key={center.code} variant="outline" className="px-3 py-1">{center.code} · {center.name}</Badge>)}
+            </CardContent>
+          </Card>
+        )}
 
         <Tabs defaultValue="list" className="space-y-4">
           <TabsList>

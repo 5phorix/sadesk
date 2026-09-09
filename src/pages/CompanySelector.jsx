@@ -136,18 +136,10 @@ export default function CompanySelector() {
     e.preventDefault();
     setCreating(true);
     try {
-      // Récupérer le plan gratuit par défaut
-      const { data: freePlan, error: planError } = await supabase
-        .from('subscription_plans').select('*').eq('slug', 'gratuit').maybeSingle();
-      if (planError) throw planError;
-
       const { data: company, error: companyError } = await supabase.from('companies').insert({
         ...newCompany,
         owner_email: user.email,
-        is_active: true,
-        subscription_plan_id: freePlan?.id || null,
-        subscription_plan_name: freePlan?.name || 'Gratuit',
-        subscription_status: 'active'
+        is_active: true
       }).select().single();
       if (companyError) throw companyError;
 

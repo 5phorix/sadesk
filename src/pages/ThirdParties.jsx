@@ -42,7 +42,6 @@ import { Badge } from '@/components/ui/badge';
 import PageHeader from '@/components/common/PageHeader';
 import StatusBadge from '@/components/common/StatusBadge';
 import ThirdPartyForm from '@/components/thirdparties/ThirdPartyForm';
-import { usePlanLimits, PlanLimitAlert } from '@/components/subscription/PlanLimitChecker';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { useUser } from '@/components/hooks/useUser';
 import { createPageUrl } from '@/utils';
@@ -60,8 +59,6 @@ export default function ThirdParties() {
   });
 
   const queryClient = useQueryClient();
-  const { currentPlan, checkLimit } = usePlanLimits();
-
   const { data: thirdParties = [], isLoading } = useQuery({
     queryKey: ['third-parties', user?.active_company_id],
     queryFn: async () => {
@@ -115,11 +112,6 @@ export default function ThirdParties() {
   });
 
   const handleNewParty = async () => {
-    const limitCheck = await checkLimit('max_third_parties', thirdParties.length);
-    if (!limitCheck.allowed) {
-      toast.error('Limite de tiers atteinte pour votre plan');
-      return;
-    }
     setSelectedParty(null);
     setFormOpen(true);
   };
@@ -140,15 +132,6 @@ export default function ThirdParties() {
           </Button>
         }
       />
-
-      {/* Alerte limites plan */}
-      {currentPlan?.limits?.max_third_parties && currentPlan.limits.max_third_parties > 0 && (
-        <PlanLimitAlert 
-          limitType="max_third_parties"
-          current={thirdParties.length}
-          limit={currentPlan.limits.max_third_parties}
-        />
-      )}
 
       {/* Filtres avancés */}
       <div className="flex flex-col md:flex-row gap-4">

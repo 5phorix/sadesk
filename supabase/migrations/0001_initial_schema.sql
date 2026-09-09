@@ -23,32 +23,6 @@ create table public.profiles (
   updated_at timestamptz not null default now()
 );
 
-create table public.subscription_plans (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  slug text not null unique,
-  description text,
-  price numeric(12, 2) not null default 0,
-  price_monthly numeric(12, 2) not null default 0,
-  price_yearly numeric(12, 2) not null default 0,
-  billing_period text not null default 'monthly',
-  features jsonb not null default '[]'::jsonb,
-  limits jsonb not null default '{}'::jsonb,
-  display_order integer not null default 0,
-  is_active boolean not null default true,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint subscription_plans_billing_period_check check (billing_period in ('monthly', 'quarterly', 'yearly'))
-);
-
-insert into public.subscription_plans (name, slug, description, price_monthly, price_yearly, features, limits, display_order)
-values
-  ('Gratuit', 'gratuit', 'Parfait pour démarrer', 0, 0, '["1 société", "1 utilisateur", "10 factures par mois"]'::jsonb, '{"max_companies":1,"max_users_per_company":1,"max_invoices_per_month":10,"max_storage_mb":100}'::jsonb, 1),
-  ('Starter', 'starter', 'Pour les petites entreprises', 9.99, 95.90, '["1 société", "3 utilisateurs", "50 factures par mois"]'::jsonb, '{"max_companies":1,"max_users_per_company":3,"max_invoices_per_month":50,"max_storage_mb":500}'::jsonb, 2),
-  ('Pro', 'pro', 'Pour les entreprises en croissance', 19.99, 191.90, '["3 sociétés", "10 utilisateurs par société", "Factures illimitées"]'::jsonb, '{"max_companies":3,"max_users_per_company":10,"max_invoices_per_month":-1,"max_storage_mb":2000}'::jsonb, 3),
-  ('Enterprise', 'enterprise', 'Pour les grandes organisations', 49, 470, '["Sociétés illimitées", "Utilisateurs illimités", "Toutes les fonctionnalités"]'::jsonb, '{"max_companies":-1,"max_users_per_company":-1,"max_invoices_per_month":-1,"max_storage_mb":-1}'::jsonb, 4)
-on conflict (slug) do nothing;
-
 create table public.companies (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -72,9 +46,6 @@ create table public.companies (
   logo_url text,
   owner_email text,
   is_active boolean not null default true,
-  subscription_plan_id uuid references public.subscription_plans(id),
-  subscription_plan_name text,
-  subscription_status text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -263,48 +234,6 @@ create table public.budgets (
   updated_at timestamptz not null default now()
 );
 
-create table public.subscriptions (
-  id uuid primary key default gen_random_uuid(),
-  company_id uuid not null references public.companies(id) on delete cascade,
-  subscription_number text,
-  third_party_id uuid references public.third_parties(id) on delete set null,
-  third_party_name text,
-  type text not null default 'expense',
-  name text not null,
-  description text,
-  amount numeric(14, 2) not null default 0,
-  frequency text not null default 'monthly',
-  start_date date,
-  end_date date,
-  next_payment_date date,
-  payment_method text,
-  account_code text,
-  status text not null default 'active',
-  auto_generate_invoice boolean not null default false,
-  notes text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table public.payments (
-  id uuid primary key default gen_random_uuid(),
-  company_id uuid not null references public.companies(id) on delete cascade,
-  payment_number text,
-  subscription_id uuid references public.subscriptions(id) on delete set null,
-  third_party_id uuid references public.third_parties(id) on delete set null,
-  third_party_name text,
-  type text,
-  amount numeric(14, 2) not null default 0,
-  payment_date date,
-  due_date date,
-  payment_method text,
-  status text not null default 'pending',
-  reference text,
-  description text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
 create table public.bank_statements (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.companies(id) on delete cascade,
@@ -443,6 +372,23 @@ as $$
   );
 $$;
 
+create or replace function public.is_company_editor(target_company_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.company_users cu
+    where cu.company_id = target_company_id
+      and cu.user_id = auth.uid()
+      and cu.status = 'active'
+      and cu.role in ('owner', 'admin', 'accountant')
+  );
+$$;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -493,12 +439,6 @@ for each row execute procedure public.set_updated_at();
 create trigger budgets_set_updated_at before update on public.budgets
 for each row execute procedure public.set_updated_at();
 
-create trigger subscriptions_set_updated_at before update on public.subscriptions
-for each row execute procedure public.set_updated_at();
-
-create trigger payments_set_updated_at before update on public.payments
-for each row execute procedure public.set_updated_at();
-
 create trigger bank_statements_set_updated_at before update on public.bank_statements
 for each row execute procedure public.set_updated_at();
 
@@ -523,9 +463,6 @@ for each row execute procedure public.set_updated_at();
 alter table public.profiles enable row level security;
 create policy profiles_select_self on public.profiles for select using (id = auth.uid());
 create policy profiles_update_self on public.profiles for update using (id = auth.uid()) with check (id = auth.uid());
-
-alter table public.subscription_plans enable row level security;
-create policy subscription_plans_select_active on public.subscription_plans for select using (is_active = true or public.is_company_admin((select active_company_id from public.profiles where id = auth.uid())));
 
 alter table public.companies enable row level security;
 create policy companies_select_member on public.companies for select using (public.is_company_member(id));
@@ -552,40 +489,44 @@ create policy company_users_update_admin on public.company_users for update usin
 create policy company_users_delete_admin on public.company_users for delete using (public.is_company_admin(company_id));
 
 alter table public.roles enable row level security;
-create policy roles_company_member on public.roles for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
+create policy roles_select_member on public.roles for select using (public.is_company_member(company_id));
+create policy roles_write_admin on public.roles for all using (public.is_company_admin(company_id)) with check (public.is_company_admin(company_id));
 
 alter table public.third_parties enable row level security;
-create policy third_parties_company_member on public.third_parties for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
+create policy third_parties_select_member on public.third_parties for select using (public.is_company_member(company_id));
+create policy third_parties_write_editor on public.third_parties for all using (public.is_company_editor(company_id)) with check (public.is_company_editor(company_id));
 
 alter table public.accounts enable row level security;
-create policy accounts_company_member on public.accounts for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
+create policy accounts_select_member on public.accounts for select using (public.is_company_member(company_id));
+create policy accounts_write_editor on public.accounts for all using (public.is_company_editor(company_id)) with check (public.is_company_editor(company_id));
 
 alter table public.cost_centers enable row level security;
-create policy cost_centers_company_member on public.cost_centers for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
+create policy cost_centers_select_member on public.cost_centers for select using (public.is_company_member(company_id));
+create policy cost_centers_write_editor on public.cost_centers for all using (public.is_company_editor(company_id)) with check (public.is_company_editor(company_id));
 
 alter table public.fiscal_years enable row level security;
-create policy fiscal_years_company_member on public.fiscal_years for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
+create policy fiscal_years_select_member on public.fiscal_years for select using (public.is_company_member(company_id));
+create policy fiscal_years_write_admin on public.fiscal_years for all using (public.is_company_admin(company_id)) with check (public.is_company_admin(company_id));
 
 alter table public.invoices enable row level security;
-create policy invoices_company_member on public.invoices for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
+create policy invoices_select_member on public.invoices for select using (public.is_company_member(company_id));
+create policy invoices_write_editor on public.invoices for all using (public.is_company_editor(company_id)) with check (public.is_company_editor(company_id));
 
 alter table public.accounting_entries enable row level security;
-create policy accounting_entries_company_member on public.accounting_entries for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
+create policy accounting_entries_select_member on public.accounting_entries for select using (public.is_company_member(company_id));
+create policy accounting_entries_write_editor on public.accounting_entries for all using (public.is_company_editor(company_id)) with check (public.is_company_editor(company_id));
 
 alter table public.budgets enable row level security;
-create policy budgets_company_member on public.budgets for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
-
-alter table public.subscriptions enable row level security;
-create policy subscriptions_company_member on public.subscriptions for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
-
-alter table public.payments enable row level security;
-create policy payments_company_member on public.payments for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
+create policy budgets_select_member on public.budgets for select using (public.is_company_member(company_id));
+create policy budgets_write_editor on public.budgets for all using (public.is_company_editor(company_id)) with check (public.is_company_editor(company_id));
 
 alter table public.bank_statements enable row level security;
-create policy bank_statements_company_member on public.bank_statements for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
+create policy bank_statements_select_member on public.bank_statements for select using (public.is_company_member(company_id));
+create policy bank_statements_write_editor on public.bank_statements for all using (public.is_company_editor(company_id)) with check (public.is_company_editor(company_id));
 
 alter table public.bank_transactions enable row level security;
-create policy bank_transactions_company_member on public.bank_transactions for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
+create policy bank_transactions_select_member on public.bank_transactions for select using (public.is_company_member(company_id));
+create policy bank_transactions_write_editor on public.bank_transactions for all using (public.is_company_editor(company_id)) with check (public.is_company_editor(company_id));
 
 alter table public.notifications enable row level security;
 create policy notifications_recipient_or_admin on public.notifications for all using (user_id = auth.uid() or public.is_company_admin(company_id)) with check (user_id = auth.uid() or public.is_company_admin(company_id));
@@ -594,13 +535,16 @@ alter table public.notification_settings enable row level security;
 create policy notification_settings_company_admin on public.notification_settings for all using (public.is_company_admin(company_id)) with check (public.is_company_admin(company_id));
 
 alter table public.tasks enable row level security;
-create policy tasks_company_member on public.tasks for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
+create policy tasks_select_member on public.tasks for select using (public.is_company_member(company_id));
+create policy tasks_write_editor on public.tasks for all using (public.is_company_editor(company_id)) with check (public.is_company_editor(company_id));
 
 alter table public.documents enable row level security;
-create policy documents_company_member on public.documents for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
+create policy documents_select_member on public.documents for select using (public.is_company_member(company_id));
+create policy documents_write_editor on public.documents for all using (public.is_company_editor(company_id)) with check (public.is_company_editor(company_id));
 
 alter table public.stock_items enable row level security;
-create policy stock_items_company_member on public.stock_items for all using (public.is_company_member(company_id)) with check (public.is_company_member(company_id));
+create policy stock_items_select_member on public.stock_items for select using (public.is_company_member(company_id));
+create policy stock_items_write_editor on public.stock_items for all using (public.is_company_editor(company_id)) with check (public.is_company_editor(company_id));
 
 create policy documents_storage_select on storage.objects
 for select to authenticated
@@ -613,25 +557,25 @@ create policy documents_storage_insert on storage.objects
 for insert to authenticated
 with check (
   bucket_id = 'documents'
-  and public.is_company_member((storage.foldername(name))[1]::uuid)
+  and public.is_company_editor((storage.foldername(name))[1]::uuid)
 );
 
 create policy documents_storage_update on storage.objects
 for update to authenticated
 using (
   bucket_id = 'documents'
-  and public.is_company_member((storage.foldername(name))[1]::uuid)
+  and public.is_company_editor((storage.foldername(name))[1]::uuid)
 )
 with check (
   bucket_id = 'documents'
-  and public.is_company_member((storage.foldername(name))[1]::uuid)
+  and public.is_company_editor((storage.foldername(name))[1]::uuid)
 );
 
 create policy documents_storage_delete on storage.objects
 for delete to authenticated
 using (
   bucket_id = 'documents'
-  and public.is_company_member((storage.foldername(name))[1]::uuid)
+  and public.is_company_editor((storage.foldername(name))[1]::uuid)
 );
 
 create index company_users_user_id_idx on public.company_users(user_id);

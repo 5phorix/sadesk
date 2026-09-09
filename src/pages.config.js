@@ -53,11 +53,12 @@ import BankReconciliation from './pages/BankReconciliation';
 import BudgetTracking from './pages/BudgetTracking';
 import CompanySelector from './pages/CompanySelector';
 import CompanyUsers from './pages/CompanyUsers';
-import Dashboard from './pages/Dashboard';
+import Dashboard from './pages/ManagementDashboard';
 import Documentation from './pages/Documentation';
 import Documents from './pages/Documents';
 import Entries from './pages/Entries';
 import FinancialManagement from './pages/FinancialManagement';
+import CashForecast from './pages/CashForecast';
 import FinancialStatements from './pages/FinancialStatements';
 import ImportExport from './pages/ImportExport';
 import Invoices from './pages/Invoices';
@@ -67,8 +68,6 @@ import RolesManagement from './pages/RolesManagement';
 import ScanInvoice from './pages/ScanInvoice';
 import Settings from './pages/Settings';
 import StockManagement from './pages/StockManagement';
-import SubscriptionManagement from './pages/SubscriptionManagement';
-import SubscriptionPlans from './pages/SubscriptionPlans';
 import Tasks from './pages/Tasks';
 import ThirdParties from './pages/ThirdParties';
 import ThirdPartyDetail from './pages/ThirdPartyDetail';
@@ -87,6 +86,7 @@ export const PAGES = {
     "Documents": Documents,
     "Entries": Entries,
     "FinancialManagement": FinancialManagement,
+    "CashForecast": CashForecast,
     "FinancialStatements": FinancialStatements,
     "ImportExport": ImportExport,
     "Invoices": Invoices,
@@ -96,8 +96,6 @@ export const PAGES = {
     "ScanInvoice": ScanInvoice,
     "Settings": Settings,
     "StockManagement": StockManagement,
-    "SubscriptionManagement": SubscriptionManagement,
-    "SubscriptionPlans": SubscriptionPlans,
     "Tasks": Tasks,
     "ThirdParties": ThirdParties,
     "ThirdPartyDetail": ThirdPartyDetail,

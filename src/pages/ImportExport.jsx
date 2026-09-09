@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { format, parseISO } from 'date-fns';
 import { useUser } from '@/components/hooks/useUser';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
@@ -80,25 +80,41 @@ export default function ImportExport() {
   // Charger les données avec filtre explicite pour éviter l'erreur RLS "$in needs an array"
   const { data: invoices = [] } = useQuery({
     queryKey: ['invoices', user?.active_company_id],
-    queryFn: () => base44.entities.Invoice.filter({ company_id: user.active_company_id }),
+    queryFn: async () => {
+      const { data, error } = await supabase.from('invoices').select('*').eq('company_id', user.active_company_id);
+      if (error) throw error;
+      return data;
+    },
     enabled: !!user?.active_company_id,
   });
 
   const { data: thirdParties = [] } = useQuery({
     queryKey: ['thirdParties', user?.active_company_id],
-    queryFn: () => base44.entities.ThirdParty.filter({ company_id: user.active_company_id }),
+    queryFn: async () => {
+      const { data, error } = await supabase.from('third_parties').select('*').eq('company_id', user.active_company_id);
+      if (error) throw error;
+      return data;
+    },
     enabled: !!user?.active_company_id,
   });
 
   const { data: entries = [] } = useQuery({
     queryKey: ['entries', user?.active_company_id],
-    queryFn: () => base44.entities.AccountingEntry.filter({ company_id: user.active_company_id }),
+    queryFn: async () => {
+      const { data, error } = await supabase.from('accounting_entries').select('*').eq('company_id', user.active_company_id);
+      if (error) throw error;
+      return data;
+    },
     enabled: !!user?.active_company_id,
   });
 
   const { data: accounts = [] } = useQuery({
     queryKey: ['accounts', user?.active_company_id],
-    queryFn: () => base44.entities.Account.filter({ company_id: user.active_company_id }),
+    queryFn: async () => {
+      const { data, error } = await supabase.from('accounts').select('*').eq('company_id', user.active_company_id);
+      if (error) throw error;
+      return data;
+    },
     enabled: !!user?.active_company_id,
   });
 
@@ -136,7 +152,11 @@ export default function ImportExport() {
     setUploadResult(null);
 
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const filePath = `${user.active_company_id}/${crypto.randomUUID()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file, { upsert: false });
+      if (uploadError) throw uploadError;
+      const { data: fileData } = supabase.storage.from('documents').getPublicUrl(filePath);
+      const file_url = fileData.publicUrl;
 
       const schemas = {
         invoices: {
@@ -260,7 +280,7 @@ export default function ImportExport() {
 
       if (importType === 'invoices') {
         // Charger les factures existantes pour vérifier les doublons
-        const existingInvoices = await base44.entities.Invoice.filter({ company_id: user.active_company_id });
+        const existingInvoices = invoices;
         
         for (const item of data) {
           if (item.invoice_number && item.third_party_name) {
@@ -276,7 +296,7 @@ export default function ImportExport() {
               continue;
             }
             
-            await base44.entities.Invoice.create({
+            const { error } = await supabase.from('invoices').insert({
               ...item,
               company_id: user.active_company_id,
               amount_ht: item.amount_ht || 0,
@@ -287,12 +307,13 @@ export default function ImportExport() {
               type: item.type || 'fournisseur',
               file_url: file_url
             });
+            if (error) throw error;
             created++;
           }
         }
       } else if (importType === 'thirdparties') {
         // Charger les tiers existants pour vérifier les doublons
-        const existingThirdParties = await base44.entities.ThirdParty.filter({ company_id: user.active_company_id });
+        const existingThirdParties = thirdParties;
         
         for (const item of data) {
           if (item.code && item.name) {
@@ -307,19 +328,20 @@ export default function ImportExport() {
               continue;
             }
             
-            await base44.entities.ThirdParty.create({
+            const { error } = await supabase.from('third_parties').insert({
               ...item,
               company_id: user.active_company_id,
               type: item.type || 'client',
               is_active: true
             });
+            if (error) throw error;
             created++;
           }
         }
       } else if (importType === 'entries') {
         for (const item of data) {
           if (item.date && item.account_code && item.label) {
-            await base44.entities.AccountingEntry.create({
+            const { error } = await supabase.from('accounting_entries').insert({
               ...item,
               company_id: user.active_company_id,
               entry_number: item.entry_number || `IMP-${Date.now()}-${created}`,
@@ -327,12 +349,13 @@ export default function ImportExport() {
               credit: parseFloat(item.credit) || 0,
               is_validated: false
             });
+            if (error) throw error;
             created++;
           }
         }
       } else if (importType === 'accounts') {
         // Charger les comptes existants pour vérifier les doublons
-        const existingAccounts = await base44.entities.Account.filter({ company_id: user.active_company_id });
+        const existingAccounts = accounts;
         
         for (const item of data) {
           if (item.code && item.label) {
@@ -347,13 +370,14 @@ export default function ImportExport() {
               continue;
             }
             
-            await base44.entities.Account.create({
+            const { error } = await supabase.from('accounts').insert({
               ...item,
               company_id: user.active_company_id,
               class: item.class || item.code.charAt(0),
               type: item.type || 'bilan',
               is_active: true
             });
+            if (error) throw error;
             created++;
           }
         }
@@ -531,7 +555,7 @@ export default function ImportExport() {
         const dateStr = entry.EcritureDate;
         const formattedDate = `${dateStr.substring(0,4)}-${dateStr.substring(4,6)}-${dateStr.substring(6,8)}`;
 
-        await base44.entities.AccountingEntry.create({
+        const { error } = await supabase.from('accounting_entries').insert({
           company_id: user.active_company_id,
           entry_number: entry.EcritureNum,
           date: formattedDate,
@@ -546,6 +570,7 @@ export default function ImportExport() {
           lettering: entry.EcritureLet,
           is_validated: !!entry.ValidDate
         });
+        if (error) throw error;
         created++;
       }
 
@@ -654,15 +679,16 @@ export default function ImportExport() {
   const handleClearData = async () => {
     try {
       const entities = {
-        invoices: { entity: base44.entities.Invoice, data: invoices },
-        thirdparties: { entity: base44.entities.ThirdParty, data: thirdParties },
-        entries: { entity: base44.entities.AccountingEntry, data: entries },
-        accounts: { entity: base44.entities.Account, data: accounts }
+        invoices: { table: 'invoices', data: invoices },
+        thirdparties: { table: 'third_parties', data: thirdParties },
+        entries: { table: 'accounting_entries', data: entries },
+        accounts: { table: 'accounts', data: accounts }
       };
 
-      const { entity, data } = entities[clearType];
+      const { table, data } = entities[clearType];
       for (const item of data) {
-        await entity.delete(item.id);
+        const { error } = await supabase.from(table).delete().eq('id', item.id).eq('company_id', user.active_company_id);
+        if (error) throw error;
       }
 
       queryClient.invalidateQueries();

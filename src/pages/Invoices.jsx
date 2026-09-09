@@ -7,12 +7,11 @@ import AmountDisplay from '../components/common/AmountDisplay';
 import StatusBadge from '../components/common/StatusBadge';
 import InvoiceForm from '../components/invoices/InvoiceForm';
 import InvoiceExportPDF from '../components/invoices/InvoiceExportPDF';
-import { usePlanLimits, PlanLimitAlert } from '@/components/subscription/PlanLimitChecker';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Filter, Download, Upload, X, Trash2, Receipt } from 'lucide-react';
-import { format, parseISO, startOfMonth } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -39,8 +38,6 @@ export default function Invoices() {
   const [generatingId, setGeneratingId] = useState(null);
 
   const queryClient = useQueryClient();
-  const { currentPlan, checkLimit } = usePlanLimits();
-
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ['invoices', user?.active_company_id],
     queryFn: async () => {
@@ -55,17 +52,6 @@ export default function Invoices() {
     },
     enabled: !!user?.active_company_id,
     staleTime: 30000,
-  });
-
-  // Calculer les factures du mois en cours
-  const currentMonthInvoices = invoices.filter(inv => {
-    try {
-      const invDate = parseISO(inv.date);
-      const monthStart = startOfMonth(new Date());
-      return invDate >= monthStart;
-    } catch {
-      return false;
-    }
   });
 
   const handleSave = () => {
@@ -332,11 +318,6 @@ export default function Invoices() {
   ];
 
   const handleNewInvoice = async () => {
-    const limitCheck = await checkLimit('max_invoices_per_month', currentMonthInvoices.length);
-    if (!limitCheck.allowed) {
-      toast.error('Limite de factures mensuelles atteinte pour votre plan');
-      return;
-    }
     setSelectedInvoice(null);
     setFormOpen(true);
   };
@@ -359,17 +340,6 @@ export default function Invoices() {
           </>
         }
       />
-
-      {/* Alerte limites plan */}
-      {currentPlan?.limits?.max_invoices_per_month && currentPlan.limits.max_invoices_per_month > 0 && (
-        <div className="mb-6">
-          <PlanLimitAlert 
-            limitType="max_invoices_per_month"
-            current={currentMonthInvoices.length}
-            limit={currentPlan.limits.max_invoices_per_month}
-          />
-        </div>
-      )}
 
       {/* Filtres */}
       <div className="bg-white rounded-2xl border border-slate-100 p-6 mb-6">
