@@ -1,15 +1,17 @@
 import React from 'react';
 import { useUser } from '@/components/hooks/useUser';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { usePermissions } from '@/components/hooks/usePermissions';
+import { Loader2, AlertCircle, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/utils';
 
 /**
- * Composant de protection des routes nécessitant une société active
- * Gère les états de chargement et redirige si nécessaire
+ * Composant de protection des routes nécessitant une société active.
+ * `permission` accepte "fonctionnalité:action", ex. "users:read".
  */
-export function ProtectedRoute({ children, requireCompany = true }) {
+export function ProtectedRoute({ children, requireCompany = true, permission = null }) {
   const { user, loading, error } = useUser();
+  const { can, membership, loading: loadingPermissions } = usePermissions();
 
   // État de chargement
   if (loading) {
@@ -76,5 +78,32 @@ export function ProtectedRoute({ children, requireCompany = true }) {
   }
 
   // Tout est OK, afficher le contenu
+  if (permission) {
+    const [feature, action] = permission.split(':');
+
+    if (loadingPermissions || (user?.active_company_id && !membership)) {
+      return (
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 text-slate-400 animate-spin" />
+        </div>
+      );
+    }
+
+    if (!can(feature, action)) {
+      return (
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <ShieldAlert className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+            <p className="text-slate-700 mb-2 font-medium">Accès non autorisé</p>
+            <p className="text-sm text-slate-500">
+              Votre rôle ne vous permet pas d&apos;accéder à cette page. Contactez un
+              administrateur de la société.
+            </p>
+          </div>
+        </div>
+      );
+    }
+  }
+
   return <>{children}</>;
 }

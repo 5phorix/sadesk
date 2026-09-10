@@ -20,6 +20,7 @@ import {
   Download
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastSupabaseError } from '@/lib/supabase-errors';
 import { format, parseISO } from 'date-fns';
 import AmountDisplay from '@/components/common/AmountDisplay';
 import BankStatementImport from '@/components/bank/BankStatementImport';
@@ -82,13 +83,32 @@ export default function BankReconciliation() {
       queryClient.invalidateQueries({ queryKey: ['entries'] });
       toast.success(result.message);
     } catch (error) {
-      console.error('Auto reconciliation failed:', error);
-      toast.error('Erreur lors du rapprochement automatique');
+      toastSupabaseError(error, "Le rapprochement automatique a échoué.");
     }
   };
 
-  const filteredTransactions = transactions.filter(t => {
-    const matchSearch = !searchTerm || 
+  const handleUnreconcile = async (transaction) => {
+    try {
+      const { error } = await supabase
+        .from('bank_transactions')
+        .update({
+          is_reconciled: false,
+          reconciled_entry_id: null,
+          reconciliation_date: null,
+          reconciliation_mode: null,
+          reconciliation_score: null
+        })
+        .eq('id', transaction.id);
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['bankTransactions'] });
+      toast.success('Rapprochement annulé');
+    } catch (error) {
+      toastSupabaseError(error, "Le rapprochement n'a pas pu être annulé.");
+    }
+  };
+
+  const filteredTransactions = transactions.filter(t => {    const matchSearch = !searchTerm || 
       t.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.reference?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchReconciled = !showReconciledOnly || t.is_reconciled;
@@ -187,6 +207,7 @@ export default function BankReconciliation() {
                         <th className="text-left p-3 text-sm font-semibold text-slate-600">Référence</th>
                         <th className="text-right p-3 text-sm font-semibold text-slate-600">Montant</th>
                         <th className="text-center p-3 text-sm font-semibold text-slate-600">Statut</th>
+                        <th className="text-right p-3 text-sm font-semibold text-slate-600" />
                       </tr>
                     </thead>
                     <tbody>
@@ -209,12 +230,24 @@ export default function BankReconciliation() {
                               <Badge className="bg-emerald-100 text-emerald-700 gap-1">
                                 <CheckCircle2 className="h-3 w-3" />
                                 Rapproché
+                                {transaction.reconciliation_mode === 'auto' && ' (auto)'}
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-orange-600 gap-1">
                                 <XCircle className="h-3 w-3" />
                                 Non rapproché
                               </Badge>
+                            )}
+                          </td>
+                          <td className="p-3 text-right">
+                            {transaction.is_reconciled && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleUnreconcile(transaction)}
+                              >
+                                Annuler
+                              </Button>
                             )}
                           </td>
                         </tr>

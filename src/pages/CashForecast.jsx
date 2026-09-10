@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useInvoices } from '@/components/hooks/useCompanyData';
+import { useManagementSettings } from '@/components/hooks/useManagement';
+import { SCENARIOS, scenarioCoefficient } from '@/lib/management';
 import { useUser } from '@/components/hooks/useUser';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import PageHeader from '@/components/common/PageHeader';
@@ -15,16 +17,17 @@ import { addDays, differenceInDays, format, startOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 const scenarioConfig = {
-  prudent: { label: 'Prudent', inflow: 0.8, outflow: 1.1, color: '#f97316' },
-  realistic: { label: 'Réaliste', inflow: 1, outflow: 1, color: '#0891b2' },
-  optimistic: { label: 'Optimiste', inflow: 1.1, outflow: 0.95, color: '#10b981' },
+  prudent: { label: 'Prudent', color: '#f97316' },
+  realiste: { label: 'Réaliste', color: '#0891b2' },
+  optimiste: { label: 'Optimiste', color: '#10b981' },
 };
 
 const amount = (value) => Math.round(value || 0).toLocaleString('fr-FR');
 
 export default function CashForecast() {
   const { user } = useUser();
-  const [scenario, setScenario] = useState('realistic');
+  const [scenario, setScenario] = useState('realiste');
+  const { data: settings } = useManagementSettings();
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices({ limit: 1000 });
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery({
     queryKey: ['bank-transactions', user?.active_company_id],
@@ -37,7 +40,9 @@ export default function CashForecast() {
   });
 
   const forecast = useMemo(() => {
-    const config = scenarioConfig[scenario];
+    // Un scénario prudent encaisse moins et décaisse plus : l'inverse du coefficient.
+    const coefficient = scenarioCoefficient(scenario, settings);
+    const config = { inflow: coefficient, outflow: 2 - coefficient };
     const today = new Date();
     const currentBalance = transactions.find((transaction) => transaction.balance_after !== null && transaction.balance_after !== undefined)?.balance_after ?? transactions.reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
     const openClientInvoices = invoices.filter((invoice) => invoice.type === 'client' && !['payee', 'payée', 'annulee', 'annulée'].includes(invoice.status));
@@ -65,7 +70,7 @@ export default function CashForecast() {
     const totalOutflows = forecast.reduce((sum, week) => sum + week.décaissements, 0);
     const lowest = forecast.reduce((lowestPoint, week) => week.solde < lowestPoint.solde ? week : lowestPoint, forecast[0]);
     return { currentBalance: Number(currentBalance || 0), forecast, totalInflows, totalOutflows, lowest, openClientInvoices, openSupplierInvoices };
-  }, [invoices, scenario, transactions]);
+  }, [invoices, scenario, transactions, settings]);
 
   const daysToTension = forecast.lowest?.solde < 0 ? differenceInDays(forecast.lowest.date, new Date()) : null;
   const isLoading = invoicesLoading || transactionsLoading;
@@ -73,7 +78,7 @@ export default function CashForecast() {
   return (
     <ProtectedRoute>
       <div className="space-y-6">
-        <PageHeader title="Prévision de trésorerie" subtitle="Anticipez vos encaissements, décaissements et besoins de financement" actions={<Select value={scenario} onValueChange={setScenario}><SelectTrigger className="w-[150px] bg-white"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(scenarioConfig).map(([key, value]) => <SelectItem key={key} value={key}>{value.label}</SelectItem>)}</SelectContent></Select>} />
+        <PageHeader title="Prévision de trésorerie" subtitle="Anticipez vos encaissements, décaissements et besoins de financement" actions={<Select value={scenario} onValueChange={setScenario}><SelectTrigger className="w-[150px] bg-white"><SelectValue /></SelectTrigger><SelectContent>{SCENARIOS.map((item) => <SelectItem key={item.key} value={item.key}>{item.label}</SelectItem>)}</SelectContent></Select>} />
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Card><CardContent className="p-5"><div className="flex items-center gap-3"><div className="rounded-xl bg-cyan-50 p-2.5 text-cyan-700"><Landmark className="h-5 w-5" /></div><div><p className="text-sm text-slate-500">Solde actuel</p><AmountDisplay amount={forecast.currentBalance} size="lg" className="font-bold" /></div></div></CardContent></Card>

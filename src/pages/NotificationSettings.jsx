@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { toastSupabaseError } from '@/lib/supabase-errors';
 import { Bell, Mail, Clock, Users, Save } from 'lucide-react';
 
 export default function NotificationSettings() {
@@ -87,7 +88,7 @@ export default function NotificationSettings() {
       toast.success(response.data.message || 'Notifications générées');
     },
     onError: (error) => {
-      toast.error('Erreur lors de la génération des notifications');
+      toastSupabaseError(error, "Les notifications n'ont pas pu être générées.");
       console.error(error);
     }
   });

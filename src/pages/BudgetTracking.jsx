@@ -1,26 +1,39 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
+import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@/components/hooks/useUser';
+import {
+  useBudgetLines,
+  useBudgets,
+  useManagementSettings,
+  useYearEntries,
+} from '@/components/hooks/useManagement';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import PageHeader from '@/components/common/PageHeader';
+import AmountDisplay from '@/components/common/AmountDisplay';
+import BudgetForm from '@/components/budget/BudgetForm';
+import ThresholdSettingsDialog from '@/components/budget/ThresholdSettingsDialog';
+import { toastSupabaseError } from '@/lib/supabase-errors';
+import {
+  MONTH_LABELS,
+  SCENARIOS,
+  buildForecast,
+  round2,
+  scenarioCoefficient,
+  summarizeBudget,
+} from '@/lib/management';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Plus,
-  TrendingUp,
-  TrendingDown,
-  AlertCircle,
-  Edit,
-  Trash2,
-  BarChart3,
-  Gauge,
-  WalletCards
-} from 'lucide-react';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,373 +50,585 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import {
+  AlertCircle,
+  BarChart3,
+  Edit,
+  Gauge,
+  MoreHorizontal,
+  Plus,
+  SlidersHorizontal,
+  Target,
+  Trash2,
+  TrendingUp,
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import AmountDisplay from '@/components/common/AmountDisplay';
-import BudgetForm from '@/components/budget/BudgetForm';
+
+const CATEGORY_LABELS = { revenue: 'Revenus', expense: 'Dépenses', investment: 'Investissements' };
+
+const STATUS_STYLES = {
+  ok: { label: 'Sous contrôle', className: 'bg-emerald-100 text-emerald-800' },
+  warning: { label: 'Vigilance', className: 'bg-amber-100 text-amber-800' },
+  alert: { label: 'Alerte', className: 'bg-red-100 text-red-800' },
+};
+
+const euro = (value) =>
+  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value || 0);
+
+const percent = (value) => (value === null || value === undefined ? '—' : `${value.toFixed(1)} %`);
+
+function VarianceValue({ value, isFavorable }) {
+  if (value === 0) return <span className="text-slate-500">—</span>;
+  return (
+    <span className={isFavorable ? 'text-emerald-600' : 'text-red-600'}>
+      {value > 0 ? '+' : ''}
+      {euro(value)}
+    </span>
+  );
+}
 
 export default function BudgetTracking() {
   const { user } = useUser();
-  const [showForm, setShowForm] = useState(false);
-  const [selectedBudget, setSelectedBudget] = useState(null);
-  const [deleteBudget, setDeleteBudget] = useState(null);
-  const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()));
   const queryClient = useQueryClient();
 
-  const { data: budgets = [] } = useQuery({
-    queryKey: ['budgets', user?.active_company_id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('budgets').select('*').eq('company_id', user.active_company_id).order('name');
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.active_company_id,
-  });
+  const [showForm, setShowForm] = useState(false);
+  const [showThresholds, setShowThresholds] = useState(false);
+  const [selectedBudget, setSelectedBudget] = useState(null);
+  const [budgetToDelete, setBudgetToDelete] = useState(null);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [scenario, setScenario] = useState('realiste');
+  const [detailBudgetId, setDetailBudgetId] = useState(null);
 
-  const { data: entries = [] } = useQuery({
-    queryKey: ['entries', user?.active_company_id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('accounting_entries').select('*').eq('company_id', user.active_company_id);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.active_company_id,
-  });
+  const { data: budgets = [], isLoading: budgetsLoading } = useBudgets();
+  const { data: budgetLines = [] } = useBudgetLines();
+  const { data: entries = [], isLoading: entriesLoading } = useYearEntries(year);
+  const { data: settings } = useManagementSettings();
 
-  const { data: costCenters = [] } = useQuery({
-    queryKey: ['cost-centers', user?.active_company_id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('cost_centers').select('code, name').eq('company_id', user.active_company_id).order('code');
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.active_company_id,
-  });
+  const coefficient = useMemo(() => scenarioCoefficient(scenario, settings), [scenario, settings]);
+  const currentMonth = year === new Date().getFullYear() ? new Date().getMonth() + 1 : 12;
+
+  const summaries = useMemo(
+    () =>
+      budgets
+        .filter((budget) => !budget.fiscal_year || Number(budget.fiscal_year) === year)
+        .map((budget) =>
+          summarizeBudget({
+            budget,
+            budgetLines,
+            entries,
+            year,
+            settings,
+            scenarioCoefficient: coefficient,
+            currentMonth,
+          })
+        ),
+    [budgets, budgetLines, entries, year, settings, coefficient, currentMonth]
+  );
+
+  const totals = useMemo(() => {
+    const budgeted = round2(summaries.reduce((total, item) => total + item.budgeted, 0));
+    const actual = round2(summaries.reduce((total, item) => total + item.actual, 0));
+    const projected = round2(summaries.reduce((total, item) => total + item.projected, 0));
+
+    return {
+      budgeted,
+      actual,
+      projected,
+      variance: round2(actual - budgeted),
+      consumption: budgeted === 0 ? null : round2((actual / budgeted) * 100),
+      alerts: summaries.filter((item) => item.status === 'alert').length,
+      warnings: summaries.filter((item) => item.status === 'warning').length,
+    };
+  }, [summaries]);
+
+  const detail = useMemo(
+    () => summaries.find((item) => item.budget.id === detailBudgetId) || summaries[0] || null,
+    [summaries, detailBudgetId]
+  );
+
+  const detailChart = useMemo(() => {
+    if (!detail) return [];
+    return detail.months.map((month) => ({
+      mois: month.label,
+      Budget: month.budgeted,
+      Réalisé: month.actual,
+      'Écart cumulé': month.cumulativeVariance,
+    }));
+  }, [detail]);
+
+  const forecastChart = useMemo(() => {
+    if (!detail) return [];
+
+    const history = detail.months.slice(0, currentMonth).map((month) => month.actual);
+    const horizon = 12 - currentMonth;
+    const projection = buildForecast(
+      history.slice(-(settings?.forecast_history_months || 6)),
+      horizon,
+      coefficient
+    );
+
+    return detail.months.map((month, index) => ({
+      mois: month.label,
+      Réalisé: index < currentMonth ? month.actual : null,
+      Prévision: index < currentMonth ? null : projection[index - currentMonth] ?? null,
+      Budget: month.budgeted,
+    }));
+  }, [detail, currentMonth, settings, coefficient]);
+
+  const years = useMemo(() => {
+    const current = new Date().getFullYear();
+    return Array.from({ length: 5 }, (_, index) => current - 2 + index);
+  }, []);
 
   const handleDelete = async () => {
-    if (deleteBudget) {
-      const { error } = await supabase.from('budgets').delete().eq('id', deleteBudget.id);
+    if (!budgetToDelete) return;
+    try {
+      const { error } = await supabase.from('budgets').delete().eq('id', budgetToDelete.id);
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['budgets', user?.active_company_id] });
+      queryClient.invalidateQueries({ queryKey: ['budget-lines', user?.active_company_id] });
       toast.success('Budget supprimé');
-      setDeleteBudget(null);
+    } catch (error) {
+      toastSupabaseError(error, "Le budget n'a pas pu être supprimé.");
+    } finally {
+      setBudgetToDelete(null);
     }
   };
 
-  // Calcul des réalisations par budget
-  const budgetAnalysis = useMemo(() => {
-    return budgets.filter(budget => !budget.fiscal_year || String(budget.fiscal_year) === selectedYear).map(budget => {
-      let realized = 0;
-      
-      // Filtrer les écritures selon le budget
-      const relatedEntries = entries.filter(entry => {
-        if (budget.account_code && !entry.account_code?.startsWith(budget.account_code.substring(0, 3))) {
-          return false;
-        }
-        if (budget.cost_center_code && entry.cost_center_code !== budget.cost_center_code) {
-          return false;
-        }
-        return true;
-      });
-
-      // Calculer le réalisé
-      if (budget.category === 'revenue') {
-        realized = relatedEntries.reduce((sum, e) => sum + (parseFloat(e.credit) || 0), 0);
-      } else {
-        realized = relatedEntries.reduce((sum, e) => sum + (parseFloat(e.debit) || 0), 0);
-      }
-
-      const budgetAmount = parseFloat(budget.total_amount) || 0;
-      const percentage = budgetAmount > 0 ? (realized / budgetAmount) * 100 : 0;
-      const remaining = budgetAmount - realized;
-      const status = percentage >= budget.alert_threshold ? 'alert' : percentage >= 75 ? 'warning' : 'ok';
-
-      return {
-        ...budget,
-        realized,
-        percentage: Math.round(percentage * 10) / 10,
-        remaining,
-        status
-      };
-    });
-  }, [budgets, entries, selectedYear]);
-
-  const stats = useMemo(() => {
-    const totalBudget = budgetAnalysis.reduce((sum, b) => sum + (parseFloat(b.total_amount) || 0), 0);
-    const totalRealized = budgetAnalysis.reduce((sum, b) => sum + b.realized, 0);
-    const alertCount = budgetAnalysis.filter(b => b.status === 'alert').length;
-    const overrun = budgetAnalysis.reduce((sum, b) => sum + Math.max(0, -b.remaining), 0);
-    const executionRate = totalBudget > 0 ? (totalRealized / totalBudget) * 100 : 0;
-    
-    return { totalBudget, totalRealized, alertCount, overrun, executionRate };
-  }, [budgetAnalysis]);
-
-  // Données pour le graphique
-  const chartData = useMemo(() => {
-    return budgetAnalysis.slice(0, 8).map(b => ({
-      name: b.name.length > 20 ? b.name.substring(0, 20) + '...' : b.name,
-      Budgété: Math.round(parseFloat(b.total_amount) || 0),
-      Réalisé: Math.round(b.realized)
-    }));
-  }, [budgetAnalysis]);
-
-  if (!user?.active_company_id) {
-    return null;
-  }
+  const isLoading = budgetsLoading || entriesLoading;
 
   return (
     <ProtectedRoute>
-      <div className="space-y-6">
+      <div>
         <PageHeader
           title="Suivi budgétaire"
-          subtitle="Mesurez les écarts entre vos ambitions et le réalisé"
+          subtitle="Comparaison budget / réalisé, analyse des écarts et projections"
           actions={
-            <div className="flex flex-wrap gap-2">
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger className="w-[130px] bg-white"><SelectValue /></SelectTrigger>
-                <SelectContent>{[0, 1, 2].map(offset => { const year = String(new Date().getFullYear() - offset); return <SelectItem key={year} value={year}>{year}</SelectItem>; })}</SelectContent>
+            <>
+              <Select value={scenario} onValueChange={setScenario}>
+                <SelectTrigger className="w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SCENARIOS.map((item) => (
+                    <SelectItem key={item.key} value={item.key}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
-              <Button onClick={() => { setSelectedBudget(null); setShowForm(true); }} className="gap-2">
-                <Plus className="h-4 w-4" /> Nouveau budget
+
+              <Select value={String(year)} onValueChange={(value) => setYear(Number(value))}>
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {years.map((item) => (
+                    <SelectItem key={item} value={String(item)}>
+                      {item}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button variant="outline" onClick={() => setShowThresholds(true)}>
+                <SlidersHorizontal className="mr-2 h-4 w-4" />
+                Seuils
               </Button>
-            </div>
+
+              <Button
+                className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                onClick={() => {
+                  setSelectedBudget(null);
+                  setShowForm(true);
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Nouveau budget
+              </Button>
+            </>
           }
         />
 
-        {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <BarChart3 className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <div className="text-sm text-slate-500">Budget total</div>
-                  <AmountDisplay amount={stats.totalBudget} size="lg" />
-                </div>
-              </div>
+              <p className="text-sm text-slate-500">Budget {SCENARIOS.find((s) => s.key === scenario)?.label.toLowerCase()}</p>
+              <p className="mt-1 text-2xl font-bold">{euro(totals.budgeted)}</p>
+              <p className="mt-1 text-xs text-slate-500">{summaries.length} budget(s) sur {year}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-cyan-100 rounded-lg"><Gauge className="h-5 w-5 text-cyan-700" /></div>
-                <div><div className="text-sm text-slate-500">Taux d'exécution</div><div className="text-2xl font-bold">{stats.executionRate.toFixed(1)}%</div></div>
-              </div>
+              <p className="text-sm text-slate-500">Réalisé à fin {MONTH_LABELS[currentMonth - 1]}</p>
+              <p className="mt-1 text-2xl font-bold">{euro(totals.actual)}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Consommation {percent(totals.consumption)}
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-rose-100 rounded-lg"><WalletCards className="h-5 w-5 text-rose-600" /></div>
-                <div><div className="text-sm text-slate-500">Dépassements</div><AmountDisplay amount={stats.overrun} size="lg" className="text-rose-700" /></div>
-              </div>
+              <p className="text-sm text-slate-500">Écart global</p>
+              <p className="mt-1 text-2xl font-bold">
+                <VarianceValue value={totals.variance} isFavorable={totals.variance <= 0} />
+              </p>
+              <p className="mt-1 text-xs text-slate-500">Projection fin d&apos;exercice {euro(totals.projected)}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <TrendingUp className="h-5 w-5 text-emerald-600" />
-                </div>
-                <div>
-                  <div className="text-sm text-slate-500">Réalisé</div>
-                  <AmountDisplay amount={stats.totalRealized} size="lg" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-orange-600" />
-                </div>
-                <div>
-                  <div className="text-sm text-slate-500">Alertes</div>
-                  <div className="text-2xl font-bold">{stats.alertCount}</div>
-                </div>
-              </div>
+              <p className="text-sm text-slate-500">Alertes</p>
+              <p className="mt-1 text-2xl font-bold text-red-600">{totals.alerts}</p>
+              <p className="mt-1 text-xs text-slate-500">{totals.warnings} en vigilance</p>
             </CardContent>
           </Card>
         </div>
 
-        {costCenters.length > 0 && (
-          <Card className="border-slate-200">
-            <CardHeader><CardTitle className="text-base">Centres de coûts disponibles</CardTitle></CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              {costCenters.map(center => <Badge key={center.code} variant="outline" className="px-3 py-1">{center.code} · {center.name}</Badge>)}
+        {totals.alerts > 0 && (
+          <Card className="mt-6 border-red-200 bg-red-50/50">
+            <CardContent className="flex items-start gap-3 pt-6">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+              <div className="text-sm text-red-900">
+                <p className="font-semibold">
+                  {totals.alerts} budget(s) dépassent le seuil d&apos;alerte
+                </p>
+                <p className="mt-1">
+                  {summaries
+                    .filter((item) => item.status === 'alert')
+                    .map((item) => `${item.budget.name} (${percent(item.consumptionPercent)})`)
+                    .join(' · ')}
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}
 
-        <Tabs defaultValue="list" className="space-y-4">
+        <Tabs defaultValue="overview" className="mt-6">
           <TabsList>
-            <TabsTrigger value="list">Liste des budgets</TabsTrigger>
-            <TabsTrigger value="chart">Graphique</TabsTrigger>
+            <TabsTrigger value="overview">
+              <Target className="mr-2 h-4 w-4" />
+              Vue d&apos;ensemble
+            </TabsTrigger>
+            <TabsTrigger value="monthly">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Budget / réalisé par mois
+            </TabsTrigger>
+            <TabsTrigger value="forecast">
+              <TrendingUp className="mr-2 h-4 w-4" />
+              Projection
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="list" className="space-y-4">
-            {budgetAnalysis.length === 0 ? (
+          <TabsContent value="overview" className="mt-4 space-y-4">
+            {isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+
+            {!isLoading && summaries.length === 0 && (
               <Card>
-                <CardContent className="text-center py-12">
-                  <BarChart3 className="h-12 w-12 mx-auto text-slate-300 mb-4" />
-                  <p className="text-slate-500 mb-4">Aucun budget défini</p>
-                  <Button onClick={() => setShowForm(true)} variant="outline">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Créer un budget
-                  </Button>
+                <CardContent className="py-12 text-center text-slate-500">
+                  <Gauge className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+                  Aucun budget défini pour {year}.
                 </CardContent>
               </Card>
-            ) : (
-              <div className="grid gap-4">
-                {budgetAnalysis.map((budget) => (
-                  <Card key={budget.id}>
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-lg text-slate-800">{budget.name}</h3>
-                            <Badge variant={budget.category === 'revenue' ? 'default' : 'outline'}>
-                              {budget.category === 'revenue' ? 'Revenus' : 
-                               budget.category === 'expense' ? 'Dépenses' : 'Investissements'}
-                            </Badge>
-                            {budget.status === 'alert' && (
-                              <Badge className="bg-red-100 text-red-700 gap-1">
-                                <AlertCircle className="h-3 w-3" />
-                                Seuil atteint
-                              </Badge>
-                            )}
-                            {budget.status === 'warning' && (
-                              <Badge className="bg-orange-100 text-orange-700">
-                                Attention
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="text-sm text-slate-500 space-y-1">
-                            {budget.account_code && <div>Compte: {budget.account_code}</div>}
-                            {budget.cost_center_code && <div>Centre de coût: {budget.cost_center_code}</div>}
-                            {budget.description && <div>{budget.description}</div>}
-                          </div>
+            )}
+
+            {summaries.map((item) => {
+              const status = STATUS_STYLES[item.status];
+              return (
+                <Card key={item.budget.id}>
+                  <CardContent className="pt-6">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-slate-900">{item.budget.name}</h3>
+                          <Badge className={status.className}>{status.label}</Badge>
+                          <Badge variant="outline">
+                            {CATEGORY_LABELS[item.budget.category] || item.budget.category}
+                          </Badge>
                         </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => { setSelectedBudget(budget); setShowForm(true); }}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Modifier
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => setDeleteBudget(budget)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Supprimer
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {item.budget.cost_center_code
+                            ? `Centre ${item.budget.cost_center_code}`
+                            : 'Tous centres'}
+                          {item.budget.account_code ? ` · Compte ${item.budget.account_code}` : ''}
+                        </p>
                       </div>
 
-                      <div className="space-y-3">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-600">Budgété</span>
-                          <AmountDisplay amount={budget.total_amount} className="font-semibold" />
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-600">Réalisé</span>
-                          <AmountDisplay 
-                            amount={budget.realized} 
-                            className={`font-semibold ${budget.status === 'alert' ? 'text-red-600' : ''}`}
-                          />
-                        </div>
-                        <Progress 
-                          value={Math.min(budget.percentage, 100)} 
-                          className={`h-2 ${
-                            budget.status === 'alert' ? 'bg-red-100 [&>div]:bg-red-600' :
-                            budget.status === 'warning' ? 'bg-orange-100 [&>div]:bg-orange-600' :
-                            'bg-emerald-100 [&>div]:bg-emerald-600'
-                          }`}
-                        />
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-slate-500">{budget.percentage}% consommé</span>
-                          <span className={`font-medium ${budget.remaining < 0 ? 'text-red-600' : 'text-slate-700'}`}>
-                            Reste: <AmountDisplay amount={budget.remaining} />
-                          </span>
-                        </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setDetailBudgetId(item.budget.id);
+                            }}
+                          >
+                            <BarChart3 className="mr-2 h-4 w-4" />
+                            Analyser
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedBudget(item.budget);
+                              setShowForm(true);
+                            }}
+                          >
+                            <Edit className="mr-2 h-4 w-4" />
+                            Modifier
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => setBudgetToDelete(item.budget)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Supprimer
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    <Progress
+                      className="mt-4"
+                      value={Math.min(100, item.consumptionPercent ?? 0)}
+                    />
+
+                    <div className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-5">
+                      <div>
+                        <p className="text-slate-500">Budget</p>
+                        <AmountDisplay amount={item.budgeted} />
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      <div>
+                        <p className="text-slate-500">Réalisé</p>
+                        <AmountDisplay amount={item.actual} />
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Écart</p>
+                        <p className="font-semibold">
+                          <VarianceValue value={item.variance} isFavorable={item.isFavorable} />
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Écart %</p>
+                        <p
+                          className={`font-semibold ${item.isFavorable ? 'text-emerald-600' : 'text-red-600'}`}
+                        >
+                          {percent(item.variancePercent)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Projection</p>
+                        <AmountDisplay amount={item.projected} />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </TabsContent>
+
+          <TabsContent value="monthly" className="mt-4 space-y-4">
+            {detail ? (
+              <>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-base">{detail.budget.name}</CardTitle>
+                    <Select
+                      value={detail.budget.id}
+                      onValueChange={(value) => setDetailBudgetId(value)}
+                    >
+                      <SelectTrigger className="w-64">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {summaries.map((item) => (
+                          <SelectItem key={item.budget.id} value={item.budget.id}>
+                            {item.budget.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={320}>
+                      <ComposedChart data={detailChart}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="mois" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => euro(value)} />
+                        <Legend />
+                        <Bar dataKey="Budget" fill="#94a3b8" />
+                        <Bar dataKey="Réalisé" fill="#1e3a5f" />
+                        <Line type="monotone" dataKey="Écart cumulé" stroke="#dc2626" dot={false} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Analyse des écarts</CardTitle>
+                  </CardHeader>
+                  <CardContent className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-slate-500">
+                          <th className="py-2 font-medium">Mois</th>
+                          <th className="py-2 text-right font-medium">Budget</th>
+                          <th className="py-2 text-right font-medium">Réalisé</th>
+                          <th className="py-2 text-right font-medium">Écart</th>
+                          <th className="py-2 text-right font-medium">Écart %</th>
+                          <th className="py-2 text-right font-medium">Cumul écart</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.months.map((month) => (
+                          <tr key={month.month} className="border-b last:border-0">
+                            <td className="py-2">{month.label}</td>
+                            <td className="py-2 text-right">{euro(month.budgeted)}</td>
+                            <td className="py-2 text-right">{euro(month.actual)}</td>
+                            <td className="py-2 text-right">
+                              <VarianceValue value={month.variance} isFavorable={month.isFavorable} />
+                            </td>
+                            <td
+                              className={`py-2 text-right ${month.isFavorable ? 'text-emerald-600' : 'text-red-600'}`}
+                            >
+                              {percent(month.variancePercent)}
+                            </td>
+                            <td className="py-2 text-right">{euro(month.cumulativeVariance)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="font-semibold">
+                          <td className="py-2">Total</td>
+                          <td className="py-2 text-right">{euro(detail.budgeted)}</td>
+                          <td className="py-2 text-right">{euro(detail.actual)}</td>
+                          <td className="py-2 text-right">
+                            <VarianceValue value={detail.variance} isFavorable={detail.isFavorable} />
+                          </td>
+                          <td className="py-2 text-right">{percent(detail.variancePercent)}</td>
+                          <td className="py-2 text-right">—</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-slate-500">
+                  Créez un budget pour accéder à la comparaison mensuelle.
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
 
-          <TabsContent value="chart">
-            <Card>
-              <CardHeader>
-                <CardTitle>Comparaison Budget vs Réalisé</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {chartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={chartData}>
+          <TabsContent value="forecast" className="mt-4">
+            {detail ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Projection {detail.budget.name} — scénario{' '}
+                    {SCENARIOS.find((s) => s.key === scenario)?.label.toLowerCase()}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <ComposedChart data={forecastChart}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
+                      <XAxis dataKey="mois" />
                       <YAxis />
-                      <Tooltip />
+                      <Tooltip formatter={(value) => (value === null ? '—' : euro(value))} />
                       <Legend />
-                      <Bar dataKey="Budgété" fill="#3b82f6" />
-                      <Bar dataKey="Réalisé" fill="#10b981" />
-                    </BarChart>
+                      <Bar dataKey="Budget" fill="#e2e8f0" />
+                      <Line type="monotone" dataKey="Réalisé" stroke="#1e3a5f" strokeWidth={2} />
+                      <Line
+                        type="monotone"
+                        dataKey="Prévision"
+                        stroke="#f59e0b"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                      />
+                    </ComposedChart>
                   </ResponsiveContainer>
-                ) : (
-                  <div className="text-center py-12 text-slate-400">
-                    Aucune donnée à afficher
+
+                  <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <p className="text-sm text-slate-500">Budget annuel</p>
+                      <p className="text-lg font-semibold">{euro(detail.budgeted)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">Projection fin d&apos;exercice</p>
+                      <p className="text-lg font-semibold">{euro(detail.projected)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">Écart projeté</p>
+                      <p className="text-lg font-semibold">
+                        <VarianceValue
+                          value={detail.projectedVariance.variance}
+                          isFavorable={detail.projectedVariance.isFavorable}
+                        />
+                      </p>
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-slate-500">
+                  Créez un budget pour générer une projection.
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
+
+        <BudgetForm
+          open={showForm}
+          budget={selectedBudget}
+          onClose={() => setShowForm(false)}
+          onSave={() => {
+            setShowForm(false);
+            queryClient.invalidateQueries({ queryKey: ['budgets', user?.active_company_id] });
+          }}
+        />
+
+        <ThresholdSettingsDialog open={showThresholds} onClose={() => setShowThresholds(false)} />
+
+        <AlertDialog open={!!budgetToDelete} onOpenChange={() => setBudgetToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer ce budget ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Le budget « {budgetToDelete?.name} » et sa ventilation mensuelle seront supprimés.
+                Cette action est irréversible.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={handleDelete}>
+                Supprimer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
-
-      <BudgetForm
-        open={showForm}
-        budget={selectedBudget}
-        onClose={() => { setShowForm(false); setSelectedBudget(null); }}
-        onSave={() => {
-          queryClient.invalidateQueries({ queryKey: ['budgets'] });
-          setShowForm(false);
-          setSelectedBudget(null);
-          toast.success('Budget enregistré');
-        }}
-      />
-
-      <AlertDialog open={!!deleteBudget} onOpenChange={() => setDeleteBudget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer le budget</AlertDialogTitle>
-            <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer le budget "{deleteBudget?.name}" ?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Supprimer
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </ProtectedRoute>
   );
 }

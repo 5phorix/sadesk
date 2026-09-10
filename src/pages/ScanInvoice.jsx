@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+import { extractStructuredData, uploadDocument } from '@/api/aiClient';
+import { toastSupabaseError } from '@/lib/supabase-errors';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@/components/hooks/useUser';
 import { useThirdParties } from '@/components/hooks/useCompanyData';
@@ -11,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Camera, Upload, FileText, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 export default function ScanInvoice() {
   const { user } = useUser();
@@ -66,8 +68,8 @@ export default function ScanInvoice() {
 
     setLoading(true);
     try {
-      // Upload le fichier
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      // Upload le fichier dans le bucket cloisonné par société
+      const { path: filePath, url: fileUrl } = await uploadDocument(file, user.active_company_id);
 
       // Utiliser les tiers du hook
       const thirdPartiesInfo = thirdParties.map(tp => ({
@@ -149,10 +151,11 @@ RÈGLES TECHNIQUES STRICTES
 ✓ Arrondir les montants à 2 décimales
 ✓ Ne JAMAIS inventer de données, extraire uniquement ce qui est visible`;
 
-      const result = await base44.integrations.Core.InvokeLLM({
-        prompt: prompt,
-        file_urls: [file_url],
-        response_json_schema: {
+      const result = await extractStructuredData({
+        companyId: user.active_company_id,
+        prompt,
+        filePaths: [filePath],
+        schema: {
           type: 'object',
           properties: {
             invoice_number: { type: 'string' },
@@ -229,7 +232,8 @@ RÈGLES TECHNIQUES STRICTES
         
         const finalData = {
           ...data,
-          file_url,
+          file_path: filePath,
+          file_url: fileUrl,
           supplier_name: matchedThirdParty?.name || data.supplier_name,
           third_party_id: matchedThirdParty?.id,
           account_code: matchedThirdParty?.account_code
@@ -362,8 +366,7 @@ RÈGLES TECHNIQUES STRICTES
         toast.error('Erreur lors de l\'extraction');
       }
     } catch (error) {
-      toast.error('Erreur lors du traitement du fichier');
-      console.error(error);
+      toastSupabaseError(error, "Impossible d'analyser cette facture.");
     } finally {
       setLoading(false);
     }
@@ -386,13 +389,16 @@ RÈGLES TECHNIQUES STRICTES
 
     setCreating(true);
     try {
-      // Vérifier les doublons
-      const existingInvoices = await base44.entities.Invoice.list();
-      const duplicate = existingInvoices.find(
-        inv => inv.invoice_number === extractedData.invoice_number && 
-               inv.third_party_name === extractedData.supplier_name
-      );
-      
+      // Vérifier les doublons (RLS limite déjà la lecture à la société active)
+      const { data: existingInvoices, error: duplicateError } = await supabase
+        .from('invoices')
+        .select('id, date, invoice_number, third_party_name')
+        .eq('company_id', user.active_company_id)
+        .eq('invoice_number', extractedData.invoice_number)
+        .limit(1);
+      if (duplicateError) throw duplicateError;
+
+      const duplicate = existingInvoices?.[0];
       if (duplicate) {
         const duplicateDate = format(parseISO(duplicate.date), 'dd/MM/yyyy');
         toast.error(`Cette facture existe déjà (créée le ${duplicateDate})`);
@@ -401,27 +407,33 @@ RÈGLES TECHNIQUES STRICTES
       }
 
       // Créer la facture avec montants garantis
-      const invoice = await base44.entities.Invoice.create({
-        company_id: user.active_company_id,
-        invoice_number: extractedData.invoice_number || `FACT-${Date.now()}`,
-        type: category === 'ventes' ? 'client' : 'fournisseur',
-        date: extractedData.date || format(new Date(), 'yyyy-MM-dd'),
-        due_date: extractedData.due_date || format(new Date(), 'yyyy-MM-dd'),
-        third_party_name: extractedData.supplier_name || 'Fournisseur',
-        third_party_id: extractedData.third_party_id,
-        description: extractedData.description || '',
-        amount_ht: parseFloat(extractedData.amount_ht) || 0,
-        tva_rate: parseFloat(extractedData.tva_rate) || 20,
-        amount_tva: parseFloat(extractedData.amount_tva) || 0,
-        amount_ttc: parseFloat(extractedData.amount_ttc) || 0,
-        status: 'validée',
-        file_url: extractedData.file_url
-      });
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert({
+          company_id: user.active_company_id,
+          invoice_number: extractedData.invoice_number || `FACT-${Date.now()}`,
+          type: category === 'ventes' ? 'client' : 'fournisseur',
+          date: extractedData.date || format(new Date(), 'yyyy-MM-dd'),
+          due_date: extractedData.due_date || format(new Date(), 'yyyy-MM-dd'),
+          third_party_name: extractedData.supplier_name || 'Fournisseur',
+          third_party_id: extractedData.third_party_id,
+          description: extractedData.description || '',
+          amount_ht: parseFloat(extractedData.amount_ht) || 0,
+          tva_rate: parseFloat(extractedData.tva_rate) || 20,
+          amount_tva: parseFloat(extractedData.amount_tva) || 0,
+          amount_ttc: parseFloat(extractedData.amount_ttc) || 0,
+          status: 'validee',
+          file_path: extractedData.file_path,
+          file_url: extractedData.file_url
+        })
+        .select()
+        .single();
+      if (invoiceError) throw invoiceError;
 
       // Créer les écritures comptables avec montants garantis numériques
       const entryNumber = `${entries[0]?.journal || 'OD'}-${invoice.invoice_number}`;
-      for (const entry of entries) {
-        await base44.entities.AccountingEntry.create({
+      const { error: entriesError } = await supabase.from('accounting_entries').insert(
+        entries.map((entry) => ({
           ...entry,
           entry_number: entryNumber,
           company_id: user.active_company_id,
@@ -429,8 +441,9 @@ RÈGLES TECHNIQUES STRICTES
           debit: parseFloat(entry.debit) || 0,
           credit: parseFloat(entry.credit) || 0,
           is_validated: false
-        });
-      }
+        }))
+      );
+      if (entriesError) throw entriesError;
 
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['entries'] });
@@ -443,8 +456,7 @@ RÈGLES TECHNIQUES STRICTES
       setExtractedData(null);
       setEntries([]);
     } catch (error) {
-      toast.error('Erreur lors de la création des écritures');
-      console.error(error);
+      toastSupabaseError(error, "Impossible de créer la facture et ses écritures.");
     } finally {
       setCreating(false);
     }

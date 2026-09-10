@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
+import { toastSupabaseError } from '@/lib/supabase-errors';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { 
@@ -12,10 +13,12 @@ import {
   Trash2,
   CheckCircle,
   Filter,
-  FileText
+  FileText,
+  Undo2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -64,6 +67,8 @@ export default function Entries() {
   const [formOpen, setFormOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [deleteEntry, setDeleteEntry] = useState(null);
+  const [entryToReverse, setEntryToReverse] = useState(null);
+  const [reversalReason, setReversalReason] = useState('');
   const [filters, setFilters] = useState({
     search: '',
     journal: 'all'
@@ -107,11 +112,37 @@ export default function Entries() {
   };
 
   const handleDelete = async () => {
-    if (deleteEntry) {
+    if (!deleteEntry) return;
+    try {
       const { error } = await supabase.from('accounting_entries').delete().eq('id', deleteEntry.id);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['entries'] });
+      toast.success('Écriture supprimée');
+    } catch (error) {
+      toastSupabaseError(error, "L'écriture n'a pas pu être supprimée.");
+    } finally {
       setDeleteEntry(null);
+    }
+  };
+
+  const handleReverse = async () => {
+    if (!entryToReverse) return;
+    try {
+      const { data, error } = await supabase.rpc('reverse_accounting_entry', {
+        target_company_id: entryToReverse.company_id,
+        target_entry_number: entryToReverse.entry_number,
+        target_date: format(new Date(), 'yyyy-MM-dd'),
+        target_reason: reversalReason || null
+      });
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+      toast.success(`Extourne ${data} créée`);
+      setReversalReason('');
+    } catch (error) {
+      toastSupabaseError(error, "L'extourne n'a pas pu être créée.");
+    } finally {
+      setEntryToReverse(null);
     }
   };
 
@@ -121,9 +152,27 @@ export default function Entries() {
   };
 
   const handleValidate = async (entry) => {
-    const { error } = await supabase.from('accounting_entries').update({ is_validated: true }).eq('id', entry.id);
-    if (error) throw error;
-    queryClient.invalidateQueries({ queryKey: ['entries'] });
+    try {
+      if (entry.entry_number) {
+        // Validation serveur : refuse une pièce dont débits et crédits ne s'équilibrent pas.
+        const { error } = await supabase.rpc('validate_accounting_entry', {
+          target_company_id: entry.company_id,
+          target_entry_number: entry.entry_number
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('accounting_entries')
+          .update({ is_validated: true })
+          .eq('id', entry.id);
+        if (error) throw error;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+      toast.success('Écriture validée');
+    } catch (error) {
+      toastSupabaseError(error, "L'écriture n'a pas pu être validée.");
+    }
   };
 
   const handleGenerateFromInvoice = async (invoice) => {
@@ -222,7 +271,8 @@ export default function Entries() {
 
       queryClient.invalidateQueries({ queryKey: ['entries'] });
     } catch (error) {
-      console.error('Error:', error);
+      toastSupabaseError(error, "Les écritures de cette facture n'ont pas pu être générées.");
+      throw error;
     }
   };
 
@@ -244,7 +294,7 @@ export default function Entries() {
       queryClient.invalidateQueries({ queryKey: ['entries'] });
       toast.success(`${invoicesWithoutEntries.length} facture(s) converties en écritures`);
     } catch (error) {
-      toast.error('Erreur lors de la génération des écritures');
+      toastSupabaseError(error, "La génération des écritures a échoué.");
     }
   };
 
@@ -370,8 +420,12 @@ export default function Entries() {
                 </>
               )}
               {row.is_validated && (
-                <DropdownMenuItem disabled>
-                  Écriture validée
+                <DropdownMenuItem
+                  onClick={() => setEntryToReverse(row)}
+                  disabled={!row.entry_number || row.is_reversal}
+                >
+                  <Undo2 className="h-4 w-4 mr-2" />
+                  Extourner
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -488,6 +542,30 @@ export default function Entries() {
               className="bg-red-600 hover:bg-red-700"
             >
               Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!entryToReverse} onOpenChange={() => setEntryToReverse(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Extourner la pièce {entryToReverse?.entry_number}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Une pièce validée ne peut pas être modifiée. L&apos;extourne crée une pièce
+              miroir qui annule ses effets, en conservant l&apos;originale intacte.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Motif de l'extourne (recommandé)"
+            value={reversalReason}
+            onChange={(e) => setReversalReason(e.target.value)}
+            rows={3}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReverse} className="bg-amber-600 hover:bg-amber-700">
+              Extourner
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

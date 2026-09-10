@@ -12,6 +12,8 @@ import {
   BookOpen,
   Check,
   Loader2,
+  Archive,
+  ArchiveRestore,
   Upload
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -39,6 +41,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { toastSupabaseError } from '@/lib/supabase-errors';
 
 const CURRENCIES = [
   { code: 'EUR', name: 'Euro (€)', symbol: '€' },
@@ -172,11 +176,26 @@ export default function CompanySelector() {
     }
   };
 
-  const myCompanies = companies.filter(c => c.owner_email === user?.email);
+  const handleArchive = async (company, event) => {
+    event.stopPropagation();
+    try {
+      const rpc = company.archived_at ? 'restore_company' : 'archive_company';
+      const { error } = await supabase.rpc(rpc, { target_company_id: company.id });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
+      toast.success(company.archived_at ? 'Société restaurée' : 'Société archivée');
+    } catch (error) {
+      toastSupabaseError(error, "L'opération sur la société a échoué.");
+    }
+  };
+
+  const activeCompanies = companies.filter((c) => !c.archived_at);
+  const myCompanies = activeCompanies.filter(c => c.owner_email === user?.email);
   const sharedCompanies = companyUsers
     .filter(cu => cu.role !== 'owner')
-    .map(cu => companies.find(c => c.id === cu.company_id))
+    .map(cu => activeCompanies.find(c => c.id === cu.company_id))
     .filter(Boolean);
+  const archivedCompanies = companies.filter((c) => c.archived_at);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
@@ -234,6 +253,15 @@ export default function CompanySelector() {
                           Ouvrir
                           <ArrowRight className="h-4 w-4" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 w-full text-slate-500"
+                          onClick={(event) => handleArchive(company, event)}
+                        >
+                          <Archive className="mr-2 h-4 w-4" />
+                          Archiver
+                        </Button>
                       </CardContent>
                     </Card>
                   ))}
@@ -282,6 +310,41 @@ export default function CompanySelector() {
                       </Card>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* Sociétés archivées */}
+            {archivedCompanies.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-lg font-semibold text-slate-700 mb-4">Sociétés archivées</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {archivedCompanies.map(company => (
+                    <Card key={company.id} className="border-2 bg-slate-50">
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div className="h-12 w-12 rounded-xl bg-slate-300 flex items-center justify-center">
+                            <Archive className="h-6 w-6 text-white" />
+                          </div>
+                          <Badge className="bg-slate-200 text-slate-700">Archivée</Badge>
+                        </div>
+                        <CardTitle className="mt-4 text-slate-600">{company.name}</CardTitle>
+                        <CardDescription className="mt-2">
+                          Données consultables mais figées.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button
+                          variant="outline"
+                          className="w-full gap-2"
+                          onClick={(event) => handleArchive(company, event)}
+                        >
+                          <ArchiveRestore className="h-4 w-4" />
+                          Restaurer
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               </div>
             )}

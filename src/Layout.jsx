@@ -24,12 +24,17 @@ import {
   TrendingUp,
   Waves,
   Target,
+  Link2,
+  PieChart,
+  CalendarCheck,
+  Gauge,
   Package,
   FolderOpen,
   Globe,
   LogOut,
   Shield,
   Bell,
+  History,
   CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -61,11 +66,20 @@ const navSections = [
       { name: 'Factures', icon: FileText, page: 'Invoices' },
       { name: 'Scanner facture', icon: Camera, page: 'ScanInvoice' },
       { name: 'Écritures', icon: Receipt, page: 'Entries' },
+      { name: 'Journaux', icon: BookOpen, page: 'Journals' },
       { name: 'Plan comptable', icon: BookOpen, page: 'Accounts' },
+      { name: 'Lettrage', icon: Link2, page: 'Lettering' },
       { name: 'Rapprochement bancaire', icon: Calculator, page: 'BankReconciliation' },
-      { name: 'Suivi budgétaire', icon: Target, page: 'BudgetTracking' },
       { name: 'États Financiers', icon: FileText, page: 'FinancialStatements' },
+    ]
+  },
+  {
+    title: 'Contrôle de gestion',
+    items: [
+      { name: 'Suivi budgétaire', icon: Gauge, page: 'BudgetTracking' },
+      { name: 'Rentabilité', icon: PieChart, page: 'Profitability' },
       { name: 'Analytique', icon: Target, page: 'AnalyticalAccounting' },
+      { name: 'Clôtures mensuelles', icon: CalendarCheck, page: 'MonthlyClosing' },
     ]
   },
   {
@@ -91,6 +105,7 @@ const navSections = [
     items: [
       { name: 'Utilisateurs', icon: Users, page: 'CompanyUsers' },
       { name: 'Rôles & Permissions', icon: Shield, page: 'RolesManagement' },
+      { name: "Journal d'audit", icon: History, page: 'AuditLog' },
     ]
   },
   {

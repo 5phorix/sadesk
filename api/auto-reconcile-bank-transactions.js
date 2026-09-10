@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { autoReconcile } from '../src/lib/accounting.js';
 
 const getSupabaseClients = (accessToken) => {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -47,59 +48,67 @@ export default async function handler(request, response) {
       .eq('status', 'active')
       .maybeSingle();
     if (membershipError) throw membershipError;
-    if (!membership) return response.status(403).json({ error: 'Acces refuse' });
+    if (!membership || !['owner', 'admin', 'accountant'].includes(membership.role)) {
+      return response.status(403).json({ error: 'Acces refuse' });
+    }
 
-    const [{ data: transactions, error: transactionsError }, { data: entries, error: entriesError }] = await Promise.all([
-      adminClient.from('bank_transactions').select('*').eq('company_id', companyId).eq('is_reconciled', false),
-      adminClient.from('accounting_entries').select('*').eq('company_id', companyId).is('lettering', null)
-    ]);
+    const [{ data: transactions, error: transactionsError }, { data: entries, error: entriesError }] =
+      await Promise.all([
+        adminClient
+          .from('bank_transactions')
+          .select('*')
+          .eq('company_id', companyId)
+          .eq('is_reconciled', false),
+        adminClient
+          .from('accounting_entries')
+          .select('*')
+          .eq('company_id', companyId)
+          .like('account_code', '5%')
+      ]);
     if (transactionsError) throw transactionsError;
     if (entriesError) throw entriesError;
 
-    const bankEntries = (entries || []).filter((entry) => entry.account_code?.startsWith('5'));
-    const results = { checked: 0, matched: 0, errors: [] };
+    // Une ecriture deja rattachee a une transaction ne peut pas servir deux fois.
+    const { data: reconciled, error: reconciledError } = await adminClient
+      .from('bank_transactions')
+      .select('reconciled_entry_id')
+      .eq('company_id', companyId)
+      .not('reconciled_entry_id', 'is', null);
+    if (reconciledError) throw reconciledError;
 
-    for (const transaction of transactions || []) {
-      results.checked++;
-      const match = bankEntries.find((entry) => {
-        const transactionAmount = Math.abs(Number.parseFloat(transaction.amount) || 0);
-        const entryAmount = Math.abs((Number.parseFloat(entry.debit) || Number.parseFloat(entry.credit) || 0));
-        const dateDifference = Math.abs(
-          (new Date(transaction.transaction_date) - new Date(entry.date)) / (1000 * 60 * 60 * 24)
-        );
-        return Math.abs(entryAmount - transactionAmount) < 0.01 && dateDifference <= 5 && !entry.lettering;
-      });
+    const used = new Set((reconciled || []).map((row) => row.reconciled_entry_id));
+    const available = (entries || []).filter((entry) => !used.has(entry.id));
 
-      if (!match) continue;
+    const { matched, ambiguous, unmatched } = autoReconcile(transactions || [], available);
 
-      const lettering = `AUTO-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      const { error: transactionUpdateError } = await adminClient
+    const today = new Date().toISOString().slice(0, 10);
+    for (const { transaction, entry, score } of matched) {
+      const { error: updateError } = await adminClient
         .from('bank_transactions')
         .update({
           is_reconciled: true,
-          reconciled_entry_id: match.id,
-          reconciliation_date: new Date().toISOString().slice(0, 10),
-          notes: 'Rapprochement automatique'
+          reconciled_entry_id: entry.id,
+          reconciliation_date: today,
+          reconciliation_mode: 'auto',
+          reconciliation_score: score,
+          notes: `Rapprochement automatique (score ${Math.round(score)} %)`
         })
         .eq('id', transaction.id)
         .eq('company_id', companyId);
-      if (transactionUpdateError) throw transactionUpdateError;
-
-      const { error: entryUpdateError } = await adminClient
-        .from('accounting_entries')
-        .update({ lettering })
-        .eq('id', match.id)
-        .eq('company_id', companyId);
-      if (entryUpdateError) throw entryUpdateError;
-
-      bankEntries.splice(bankEntries.indexOf(match), 1);
-      results.matched++;
+      if (updateError) throw updateError;
     }
 
     return response.status(200).json({
       success: true,
-      message: `${results.matched} transaction(s) rapprochee(s) sur ${results.checked} verifiee(s)`,
-      details: results
+      message:
+        `${matched.length} transaction(s) rapprochee(s) sur ${(transactions || []).length} analysee(s)` +
+        (ambiguous.length > 0 ? `, ${ambiguous.length} a arbitrer manuellement` : ''),
+      details: {
+        checked: (transactions || []).length,
+        matched: matched.length,
+        ambiguous: ambiguous.length,
+        unmatched: unmatched.length
+      }
     });
   } catch (error) {
     console.error('Auto reconciliation failed:', error);

@@ -21,6 +21,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { toastSupabaseError } from '@/lib/supabase-errors';
 import { createPageUrl } from '../utils';
 import {
   AlertDialog,
@@ -110,8 +111,7 @@ export default function Documents() {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       toast.success(`${files.length} document(s) téléversé(s)`);
     } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Erreur lors du téléversement');
+      toastSupabaseError(error, "Le téléversement des documents a échoué.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

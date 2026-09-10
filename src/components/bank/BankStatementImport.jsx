@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '@/api/supabaseClient';
-import { base44 } from '@/api/base44Client';
+import { extractStructuredData, uploadDocument } from '@/api/aiClient';
+import { toastSupabaseError } from '@/lib/supabase-errors';
 import { useUser } from '@/components/hooks/useUser';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -30,15 +31,14 @@ export default function BankStatementImport() {
   const handleImport = async () => {
     if (!file) return;
 
+    if (!user?.active_company_id) {
+      toast.error('Veuillez sélectionner une société avant d\'importer');
+      return;
+    }
+
     setLoading(true);
     try {
-      const filePath = `${user.active_company_id}/${crypto.randomUUID()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, file, { upsert: false });
-      if (uploadError) throw uploadError;
-      const { data: fileData } = supabase.storage.from('documents').getPublicUrl(filePath);
-      const file_url = fileData.publicUrl;
+      const { path: filePath } = await uploadDocument(file, user.active_company_id);
 
       // Prompt professionnel pour relevé bancaire
       const bankPrompt = `Tu es un expert-comptable. Analyse ce relevé bancaire avec PRÉCISION PROFESSIONNELLE.
@@ -84,10 +84,11 @@ RÈGLES TECHNIQUES
 ✓ Ne pas ignorer les petites transactions
 ✓ Ignorer les lignes d'en-tête et de total`;
 
-      const extractedData = await base44.integrations.Core.InvokeLLM({
+      const extractedData = await extractStructuredData({
+        companyId: user.active_company_id,
         prompt: bankPrompt,
-        file_urls: [file_url],
-        response_json_schema: {
+        filePaths: [filePath],
+        schema: {
           type: 'object',
           properties: {
             transactions: {
@@ -127,8 +128,7 @@ RÈGLES TECHNIQUES
         toast.error('Aucune transaction trouvée dans le fichier');
       }
     } catch (error) {
-      toast.error('Erreur lors de l\'import du fichier');
-      console.error(error);
+      toastSupabaseError(error, "Impossible d'analyser ce relevé bancaire.");
     } finally {
       setLoading(false);
     }
@@ -158,8 +158,7 @@ RÈGLES TECHNIQUES
       setFile(null);
       setPreview(null);
     } catch (error) {
-      toast.error('Erreur lors de l\'import des transactions');
-      console.error(error);
+      toastSupabaseError(error, "Impossible d'enregistrer les transactions importées.");
     } finally {
       setLoading(false);
     }

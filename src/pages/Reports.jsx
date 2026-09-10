@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
+import { generateText } from '@/api/aiClient';
+import { toastSupabaseError } from '@/lib/supabase-errors';
 import { useUser } from '@/components/hooks/useUser';
 import PageHeader from '@/components/common/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -184,6 +186,11 @@ export default function Reports() {
 
   // Analyse IA
   const handleAIAnalysis = async () => {
+    if (!user?.active_company_id) {
+      toast.error('Veuillez sélectionner une société avant de lancer l\'analyse');
+      return;
+    }
+
     setAiAnalysisLoading(true);
     try {
       const profitLoss = calculateProfitLoss();
@@ -217,16 +224,15 @@ Fournis:
 
 Format: Markdown avec structure claire.`;
 
-      const response = await base44.integrations.Core.InvokeLLM({
-        prompt,
-        add_context_from_internet: false
+      const response = await generateText({
+        companyId: user.active_company_id,
+        prompt
       });
 
       setAiInsight(response);
       toast.success('Analyse IA terminée');
     } catch (error) {
-      toast.error('Erreur lors de l\'analyse IA');
-      console.error(error);
+      toastSupabaseError(error, "L'analyse IA n'a pas pu être réalisée.");
     } finally {
       setAiAnalysisLoading(false);
     }

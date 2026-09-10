@@ -1,39 +1,50 @@
-**Welcome to your Base44 project** 
+**SADESK Compta**
 
-**About**
+Application de comptabilité multi-sociétés (React + Vite + Supabase).
 
-View and Edit  your app on [Base44.com](http://Base44.com) 
+**Prérequis**
 
-This project contains everything you need to run your app locally.
-
-**Edit the code in your local development environment**
-
-Any change pushed to the repo will also be reflected in the Base44 Builder.
-
-**Prerequisites:** 
-
-1. Clone the repository using the project's Git URL 
-2. Navigate to the project directory
-3. Install dependencies: `npm install`
-4. Create an `.env.local` file and set the right environment variables
+1. Cloner le dépôt
+2. `npm install`
+3. Créer un fichier `.env.local` :
 
 ```
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=your_backend_url
-
-e.g.
-VITE_BASE44_APP_ID=cbef744a8545c389ef439ea6
-VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
+VITE_SUPABASE_URL=https://votre-projet.supabase.co
+VITE_SUPABASE_ANON_KEY=votre_cle_anon
 ```
 
-Run the app: `npm run dev`
+4. `npm run dev`
 
-**Publish your changes**
+**Variables d'environnement serveur** (endpoints `api/`, jamais exposées au navigateur) :
 
-Open [Base44.com](http://Base44.com) and click on Publish.
+```
+SUPABASE_URL=https://votre-projet.supabase.co
+SUPABASE_ANON_KEY=votre_cle_anon
+SUPABASE_SERVICE_ROLE_KEY=votre_cle_service_role
+AI_API_KEY=cle_du_fournisseur_llm
+AI_BASE_URL=https://api.openai.com/v1   # optionnel
+AI_MODEL=gpt-4o-mini                    # optionnel
+```
 
-**Docs & Support**
+**Base de données**
 
-Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
+Les migrations se trouvent dans `supabase/migrations/`. Appliquez-les avec :
 
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+```
+supabase db push
+```
+
+**Scripts**
+
+| Commande | Description |
+| --- | --- |
+| `npm run dev` | Serveur de développement |
+| `npm run build` | Build de production |
+| `npm run lint` | Analyse ESLint |
+| `npm run test` | Tests unitaires (Vitest) |
+| `npm run test:integration` | Tests d'isolation multi-sociétés et de rôles (nécessite une base Supabase de test) |
+
+**Tests d'intégration**
+
+Ils vérifient le cloisonnement des données entre sociétés et les permissions des rôles
+`viewer`, `accountant`, `admin`, `owner`. Voir `tests/integration/README.md`.

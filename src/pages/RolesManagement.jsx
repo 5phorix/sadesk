@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Plus, Shield, Edit, Trash2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastSupabaseError } from '@/lib/supabase-errors';
 
 const PERMISSION_MODULES = [
   { key: 'invoices', label: 'Facturation', permissions: ['create', 'read', 'update', 'delete'] },
@@ -132,7 +133,7 @@ export default function RolesManagement() {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       setShowForm(false);
     } catch (error) {
-      toast.error('Erreur lors de la sauvegarde');
+      toastSupabaseError(error, "L'enregistrement du rôle a échoué.");
     }
   };
 

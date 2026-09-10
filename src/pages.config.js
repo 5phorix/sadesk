@@ -49,6 +49,7 @@
  */
 import Accounts from './pages/Accounts';
 import AnalyticalAccounting from './pages/AnalyticalAccounting';
+import AuditLog from './pages/AuditLog';
 import BankReconciliation from './pages/BankReconciliation';
 import BudgetTracking from './pages/BudgetTracking';
 import CompanySelector from './pages/CompanySelector';
@@ -62,7 +63,11 @@ import CashForecast from './pages/CashForecast';
 import FinancialStatements from './pages/FinancialStatements';
 import ImportExport from './pages/ImportExport';
 import Invoices from './pages/Invoices';
+import Journals from './pages/Journals';
+import Lettering from './pages/Lettering';
+import MonthlyClosing from './pages/MonthlyClosing';
 import NotificationSettings from './pages/NotificationSettings';
+import Profitability from './pages/Profitability';
 import Reports from './pages/Reports';
 import RolesManagement from './pages/RolesManagement';
 import ScanInvoice from './pages/ScanInvoice';
@@ -77,6 +82,7 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "Accounts": Accounts,
     "AnalyticalAccounting": AnalyticalAccounting,
+    "AuditLog": AuditLog,
     "BankReconciliation": BankReconciliation,
     "BudgetTracking": BudgetTracking,
     "CompanySelector": CompanySelector,
@@ -90,7 +96,11 @@ export const PAGES = {
     "FinancialStatements": FinancialStatements,
     "ImportExport": ImportExport,
     "Invoices": Invoices,
+    "Journals": Journals,
+    "Lettering": Lettering,
+    "MonthlyClosing": MonthlyClosing,
     "NotificationSettings": NotificationSettings,
+    "Profitability": Profitability,
     "Reports": Reports,
     "RolesManagement": RolesManagement,
     "ScanInvoice": ScanInvoice,

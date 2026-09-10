@@ -2,19 +2,21 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useUser } from '@/components/hooks/useUser';
+import { usePermissions } from '@/components/hooks/usePermissions';
 import {
-  Users,
-  Plus,
-  Mail,
-  Shield,
-  Check,
-  X,
-  Trash2,
-  Loader2
-} from 'lucide-react';
+  ACTION_LABELS,
+  FEATURES,
+  ROLES,
+  effectivePermissions,
+  isRestricted,
+  rolePermissions,
+  sanitizePermissions,
+} from '@/lib/permissions';
+import { Users, Plus, Mail, Shield, Check, X, Trash2, Loader2, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -22,17 +24,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -50,345 +47,462 @@ import { Badge } from '@/components/ui/badge';
 import PageHeader from '@/components/common/PageHeader';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { toast } from 'sonner';
+import { toastSupabaseError } from '@/lib/supabase-errors';
 
-const ROLES = [
-  { value: 'owner', label: 'Propriétaire', description: 'Tous les droits' },
-  { value: 'admin', label: 'Administrateur', description: 'Gestion complète' },
-  { value: 'accountant', label: 'Comptable', description: 'Saisie et consultation' },
-  { value: 'viewer', label: 'Lecteur', description: 'Consultation uniquement' }
-];
+const STATUS_STYLES = {
+  active: { label: 'Actif', className: 'bg-emerald-100 text-emerald-800' },
+  pending: { label: 'Invitation envoyée', className: 'bg-amber-100 text-amber-800' },
+  inactive: { label: 'Désactivé', className: 'bg-slate-200 text-slate-700' },
+};
+
+function PermissionEditor({ role, value, onChange }) {
+  const ceiling = rolePermissions(role);
+  const effective = effectivePermissions(role, value);
+
+  const toggle = (feature, action) => {
+    const current = effective[feature] || [];
+    const next = current.includes(action)
+      ? current.filter((item) => item !== action)
+      : [...current, action];
+    onChange({ ...effective, [feature]: next });
+  };
+
+  return (
+    <div className="space-y-3">
+      {FEATURES.map((feature) => {
+        const allowed = ceiling[feature.key] || [];
+        if (allowed.length === 0) return null;
+
+        return (
+          <div key={feature.key} className="rounded-lg border p-3">
+            <p className="mb-2 text-sm font-medium text-slate-900">{feature.label}</p>
+            <div className="flex flex-wrap gap-4">
+              {feature.actions.map((action) => {
+                const permitted = allowed.includes(action);
+                return (
+                  <label
+                    key={action}
+                    className={`flex items-center gap-2 text-sm ${permitted ? 'text-slate-700' : 'text-slate-300'}`}
+                  >
+                    <Checkbox
+                      disabled={!permitted}
+                      checked={(effective[feature.key] || []).includes(action)}
+                      onCheckedChange={() => toggle(feature.key, action)}
+                    />
+                    {ACTION_LABELS[action] || action}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+      <p className="text-xs text-slate-500">
+        Les actions grisées ne sont pas accessibles au rôle sélectionné : une permission ne peut que
+        restreindre le rôle, jamais l&apos;étendre.
+      </p>
+    </div>
+  );
+}
 
 export default function CompanyUsers() {
   const queryClient = useQueryClient();
   const { user, loading: loadingUser } = useUser();
-  const [showInvite, setShowInvite] = useState(false);
-  const [deleteUser, setDeleteUser] = useState(null);
-  const [inviteData, setInviteData] = useState({
-    email: '',
-    name: '',
-    role: 'viewer'
-  });
+  const { can, isOwner } = usePermissions();
 
-  const { data: companies = [] } = useQuery({
-    queryKey: ['companies'],
+  const [showInvite, setShowInvite] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState(null);
+  const [permissionTarget, setPermissionTarget] = useState(null);
+  const [permissionDraft, setPermissionDraft] = useState({});
+  const [inviteData, setInviteData] = useState({ email: '', name: '', role: 'viewer' });
+
+  const companyId = user?.active_company_id;
+
+  const { data: activeCompany } = useQuery({
+    queryKey: ['company', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('companies').select('*');
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name, owner_email')
+        .eq('id', companyId)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.active_company_id
+    enabled: !!companyId,
   });
 
-  const activeCompany = companies.find(c => c.id === user?.active_company_id);
-
-  const { data: companyUsers = [], isLoading } = useQuery({
-    queryKey: ['company-users', user?.active_company_id],
+  const { data: members = [], isLoading } = useQuery({
+    queryKey: ['company-users', companyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('company_users')
         .select('*')
-        .eq('company_id', user.active_company_id)
+        .eq('company_id', companyId)
         .order('created_at');
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.active_company_id,
-    staleTime: 30000
+    enabled: !!companyId,
+    staleTime: 30_000,
   });
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['company-users', companyId] });
 
   const inviteMutation = useMutation({
     mutationFn: async (data) => {
-      const { data: membership, error } = await supabase.from('company_users').insert({
-        company_id: user.active_company_id,
-        user_id: null,
-        company_name: activeCompany?.name,
-        user_email: data.email,
-        user_name: data.name,
-        role: data.role,
-        status: 'pending',
-        invited_by: user.email,
-        permissions: getRolePermissions(data.role)
-      }).select().single();
-      if (error) throw error;
-      return membership;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Session expirée, veuillez vous reconnecter.');
+
+      const response = await fetch('/api/invite-user', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ company_id: companyId, ...data }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "L'invitation a échoué.");
+      return payload;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['company-users'] });
+    onSuccess: (payload) => {
+      refresh();
       setShowInvite(false);
       setInviteData({ email: '', name: '', role: 'viewer' });
-      toast.success('Invitation envoyée');
+      toast.success(payload.message);
     },
-    onError: (error) => {
-      toast.error('Erreur lors de l\'invitation');
-    }
+    onError: (error) => toastSupabaseError(error, "L'invitation n'a pas pu être envoyée."),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, ...changes }) => {
+      const { error } = await supabase
+        .from('company_users')
+        .update(changes)
+        .eq('id', id)
+        .eq('company_id', companyId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refresh();
+      toast.success('Membre mis à jour');
+    },
+    onError: (error) => toastSupabaseError(error, "Le membre n'a pas pu être mis à jour."),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (userId) => {
-      const { error } = await supabase.from('company_users').delete().eq('id', userId).eq('company_id', user.active_company_id);
+    mutationFn: async (id) => {
+      const { error } = await supabase
+        .from('company_users')
+        .delete()
+        .eq('id', id)
+        .eq('company_id', companyId);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['company-users'] });
-      setDeleteUser(null);
+      refresh();
+      setMemberToDelete(null);
       toast.success('Utilisateur retiré');
-    }
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }) => {
-      const { error } = await supabase.from('company_users').update({ status }).eq('id', id).eq('company_id', user.active_company_id);
-      if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['company-users'] });
-      toast.success('Statut mis à jour');
-    }
+    onError: (error) => toastSupabaseError(error, "L'utilisateur n'a pas pu être retiré."),
   });
 
-  const getRolePermissions = (role) => {
-    switch (role) {
-      case 'owner':
-      case 'admin':
-        return {
-          invoices: { create: true, read: true, update: true, delete: true },
-          entries: { create: true, read: true, update: true, delete: true },
-          settings: true
-        };
-      case 'accountant':
-        return {
-          invoices: { create: true, read: true, update: true, delete: false },
-          entries: { create: true, read: true, update: true, delete: false },
-          settings: false
-        };
-      case 'viewer':
-        return {
-          invoices: { create: false, read: true, update: false, delete: false },
-          entries: { create: false, read: true, update: false, delete: false },
-          settings: false
-        };
-      default:
-        return {
-          invoices: { create: false, read: true, update: false, delete: false },
-          entries: { create: false, read: true, update: false, delete: false },
-          settings: false
-        };
-    }
+  const openPermissions = (member) => {
+    setPermissionTarget(member);
+    setPermissionDraft(effectivePermissions(member.role, member.permissions));
   };
 
-  const handleInvite = (e) => {
-    e.preventDefault();
-    inviteMutation.mutate(inviteData);
+  const savePermissions = () => {
+    updateMutation.mutate({
+      id: permissionTarget.id,
+      permissions: sanitizePermissions(permissionTarget.role, permissionDraft),
+    });
+    setPermissionTarget(null);
   };
 
-  const isOwner = activeCompany?.owner_email === user?.email;
+  const owners = members.filter((member) => member.role === 'owner' && member.status === 'active');
+  const canManage = can('users', 'update');
 
   if (loadingUser) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 text-slate-400 animate-spin" />
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
       </div>
     );
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute permission="users:read">
       <div className="space-y-6">
-      <PageHeader
-        title="Utilisateurs"
-        subtitle={`Gérez les accès à ${activeCompany?.name}`}
-        actions={
-          isOwner && (
-            <Button 
-              onClick={() => setShowInvite(true)}
-              className="gap-2 bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-            >
-              <Plus className="h-4 w-4" />
-              Inviter un utilisateur
-            </Button>
-          )
-        }
-      />
+        <PageHeader
+          title="Utilisateurs"
+          subtitle={`Gérez les accès à ${activeCompany?.name || 'la société'}`}
+          actions={
+            can('users', 'create') && (
+              <Button className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={() => setShowInvite(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Inviter
+              </Button>
+            )
+          }
+        />
 
-      {/* Liste des utilisateurs */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Membres de l'équipe</CardTitle>
-          <CardDescription>
-            {companyUsers.length} utilisateur{companyUsers.length > 1 ? 's' : ''}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-16 bg-slate-100 rounded-xl animate-pulse" />
-              ))}
-            </div>
-          ) : companyUsers.length === 0 ? (
-            <div className="text-center py-12">
-              <Users className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500">Aucun utilisateur</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {companyUsers.map((cu) => (
-                <div 
-                  key={cu.id}
-                  className="flex items-center justify-between p-4 bg-slate-50 rounded-xl"
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Membres ({members.length})
+            </CardTitle>
+            <CardDescription>
+              Les droits sont appliqués par la base de données : masquer un bouton ne suffit pas à
+              autoriser une action.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+
+            {members.map((member) => {
+              const status = STATUS_STYLES[member.status] || STATUS_STYLES.inactive;
+              const restricted = isRestricted(member.role, member.permissions);
+              const isLastOwner = member.role === 'owner' && owners.length <= 1;
+              const isSelf = member.user_id === user?.id;
+
+              return (
+                <div
+                  key={member.id}
+                  className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#1e3a5f] to-[#2d4a6f] flex items-center justify-center text-white font-semibold">
-                      {cu.user_name?.charAt(0)?.toUpperCase() || cu.user_email?.charAt(0)?.toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-medium text-slate-800">{cu.user_name || cu.user_email}</h4>
-                        {cu.status === 'pending' && (
-                          <Badge variant="outline" className="text-xs">En attente</Badge>
-                        )}
-                        {cu.role === 'owner' && (
-                          <Badge className="bg-emerald-100 text-emerald-700 text-xs">Propriétaire</Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-slate-500">{cu.user_email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <Shield className="h-4 w-4 text-slate-400" />
-                      <span className="text-sm text-slate-600">
-                        {ROLES.find(r => r.value === cu.role)?.label}
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-slate-900">
+                        {member.user_name || member.user_email}
                       </span>
+                      <Badge className={status.className}>{status.label}</Badge>
+                      {restricted && (
+                        <Badge variant="outline" className="text-amber-700">
+                          Droits restreints
+                        </Badge>
+                      )}
+                      {isSelf && <Badge variant="outline">Vous</Badge>}
                     </div>
-                    {cu.status === 'pending' && isOwner && (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateStatusMutation.mutate({ id: cu.id, status: 'active' })}
-                        >
-                          <Check className="h-4 w-4 text-emerald-600" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateStatusMutation.mutate({ id: cu.id, status: 'suspended' })}
-                        >
-                          <X className="h-4 w-4 text-red-600" />
-                        </Button>
-                      </div>
-                    )}
-                    {cu.role !== 'owner' && isOwner && (
+                    <p className="mt-1 flex items-center gap-1 text-sm text-slate-500">
+                      <Mail className="h-3 w-3" />
+                      {member.user_email}
+                      {member.invited_by && ` · invité par ${member.invited_by}`}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Select
+                      value={member.role}
+                      disabled={!canManage || isLastOwner || (member.role === 'owner' && !isOwner)}
+                      onValueChange={(role) =>
+                        updateMutation.mutate({
+                          id: member.id,
+                          role,
+                          permissions: sanitizePermissions(role, {}),
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-44">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROLES.map((role) => (
+                          <SelectItem
+                            key={role.value}
+                            value={role.value}
+                            disabled={role.value === 'owner' && !isOwner}
+                          >
+                            {role.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!canManage}
+                      onClick={() => openPermissions(member)}
+                    >
+                      <SlidersHorizontal className="mr-2 h-4 w-4" />
+                      Droits
+                    </Button>
+
+                    {member.status === 'active' ? (
                       <Button
                         variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-red-500 hover:text-red-700"
-                        onClick={() => setDeleteUser(cu)}
+                        size="sm"
+                        disabled={!canManage || isLastOwner || isSelf}
+                        onClick={() => updateMutation.mutate({ id: member.id, status: 'inactive' })}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <X className="mr-1 h-4 w-4" />
+                        Désactiver
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={!canManage}
+                        onClick={() => updateMutation.mutate({ id: member.id, status: 'active' })}
+                      >
+                        <Check className="mr-1 h-4 w-4" />
+                        Activer
                       </Button>
                     )}
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-red-500 hover:bg-red-50 hover:text-red-700"
+                      disabled={!can('users', 'delete') || isLastOwner || isSelf}
+                      onClick={() => setMemberToDelete(member)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              );
+            })}
 
-      {/* Dialog invitation */}
-      <Dialog open={showInvite} onOpenChange={setShowInvite}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Inviter un utilisateur</DialogTitle>
-            <DialogDescription>
-              Ajoutez un nouveau membre à votre équipe
-            </DialogDescription>
-          </DialogHeader>
+            {!isLoading && members.length === 0 && (
+              <p className="py-8 text-center text-sm text-slate-500">Aucun membre.</p>
+            )}
+          </CardContent>
+        </Card>
 
-          <form onSubmit={handleInvite} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Email *</Label>
-              <Input
-                type="email"
-                value={inviteData.email}
-                onChange={(e) => setInviteData(d => ({ ...d, email: e.target.value }))}
-                placeholder="utilisateur@example.com"
-                required
+        <Dialog open={showInvite} onOpenChange={setShowInvite}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Inviter un utilisateur</DialogTitle>
+              <DialogDescription>
+                Un email d&apos;invitation est envoyé. Si un compte existe déjà, l&apos;accès est
+                accordé immédiatement.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                inviteMutation.mutate(inviteData);
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label>Adresse email *</Label>
+                <Input
+                  type="email"
+                  required
+                  value={inviteData.email}
+                  onChange={(e) => setInviteData({ ...inviteData, email: e.target.value })}
+                  placeholder="collaborateur@exemple.fr"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Nom</Label>
+                <Input
+                  value={inviteData.name}
+                  onChange={(e) => setInviteData({ ...inviteData, name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Rôle *</Label>
+                <Select
+                  value={inviteData.role}
+                  onValueChange={(role) => setInviteData({ ...inviteData, role })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map((role) => (
+                      <SelectItem
+                        key={role.value}
+                        value={role.value}
+                        disabled={role.value === 'owner' && !isOwner}
+                      >
+                        <div>
+                          <p>{role.label}</p>
+                          <p className="text-xs text-slate-500">{role.description}</p>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowInvite(false)}>
+                  Annuler
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                  disabled={inviteMutation.isPending}
+                >
+                  {inviteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Envoyer l&apos;invitation
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!permissionTarget} onOpenChange={() => setPermissionTarget(null)}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Droits de {permissionTarget?.user_name || permissionTarget?.user_email}
+              </DialogTitle>
+              <DialogDescription>
+                Rôle : {ROLES.find((role) => role.value === permissionTarget?.role)?.label}
+              </DialogDescription>
+            </DialogHeader>
+
+            {permissionTarget && (
+              <PermissionEditor
+                role={permissionTarget.role}
+                value={permissionDraft}
+                onChange={setPermissionDraft}
               />
-            </div>
+            )}
 
-            <div className="space-y-2">
-              <Label>Nom</Label>
-              <Input
-                value={inviteData.name}
-                onChange={(e) => setInviteData(d => ({ ...d, name: e.target.value }))}
-                placeholder="Jean Dupont"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Rôle *</Label>
-              <Select value={inviteData.role} onValueChange={(v) => setInviteData(d => ({ ...d, role: v }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLES.filter(r => r.value !== 'owner').map(role => (
-                    <SelectItem key={role.value} value={role.value}>
-                      <div>
-                        <div className="font-medium">{role.label}</div>
-                        <div className="text-xs text-slate-500">{role.description}</div>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={() => setShowInvite(false)} className="flex-1">
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPermissionTarget(null)}>
                 Annuler
               </Button>
-              <Button 
-                type="submit" 
-                className="flex-1 bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-                disabled={inviteMutation.isPending}
-              >
-                {inviteMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Mail className="h-4 w-4 mr-2" />
-                )}
-                Envoyer l'invitation
+              <Button className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={savePermissions}>
+                Enregistrer
               </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Delete Dialog */}
-      <AlertDialog open={!!deleteUser} onOpenChange={() => setDeleteUser(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Retirer l'utilisateur</AlertDialogTitle>
-            <AlertDialogDescription>
-              Êtes-vous sûr de vouloir retirer {deleteUser?.user_name || deleteUser?.user_email} ? 
-              Il n'aura plus accès à cette société.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => deleteMutation.mutate(deleteUser.id)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Retirer
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <AlertDialog open={!!memberToDelete} onOpenChange={() => setMemberToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Retirer cet utilisateur ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {memberToDelete?.user_email} perdra tout accès à cette société. Les écritures qu&apos;il
+                a saisies sont conservées.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700"
+                onClick={() => deleteMutation.mutate(memberToDelete.id)}
+              >
+                Retirer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </ProtectedRoute>
   );

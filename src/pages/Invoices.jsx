@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { toastSupabaseError } from '@/lib/supabase-errors';
 import { useUser } from '@/components/hooks/useUser';
 
 export default function Invoices() {
@@ -196,8 +197,7 @@ export default function Invoices() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success(`3 écritures générées pour ${invoice.invoice_number}`);
     } catch (error) {
-      console.error('Error generating entries:', error);
-      toast.error('Erreur lors de la génération des écritures');
+      toastSupabaseError(error, "Les écritures de cette facture n'ont pas pu être générées.");
     } finally {
       setGeneratingId(null);
     }

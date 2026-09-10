@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
-import { format, parseISO } from 'date-fns';
+import { extractStructuredData, uploadDocument } from '@/api/aiClient';
+import { getSupabaseErrorMessage, toastSupabaseError } from '@/lib/supabase-errors';
+import { buildFecRows, fecFileName, serializeFec, validateFec } from '@/lib/fec';
+import { format } from 'date-fns';
 import { useUser } from '@/components/hooks/useUser';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { 
@@ -118,6 +121,20 @@ export default function ImportExport() {
     enabled: !!user?.active_company_id,
   });
 
+  const { data: company } = useQuery({
+    queryKey: ['company', user?.active_company_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name, siret')
+        .eq('id', user.active_company_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.active_company_id,
+  });
+
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -152,11 +169,7 @@ export default function ImportExport() {
     setUploadResult(null);
 
     try {
-      const filePath = `${user.active_company_id}/${crypto.randomUUID()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file, { upsert: false });
-      if (uploadError) throw uploadError;
-      const { data: fileData } = supabase.storage.from('documents').getPublicUrl(filePath);
-      const file_url = fileData.publicUrl;
+      const { path: filePath } = await uploadDocument(file, user.active_company_id);
 
       const schemas = {
         invoices: {
@@ -246,17 +259,13 @@ export default function ImportExport() {
         }
       };
 
-      const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
-        file_url,
-        json_schema: schemas[importType]
+      const output = await extractStructuredData({
+        companyId: user.active_company_id,
+        prompt: `Extrais l'intégralité des lignes de type "${importType}" présentes dans ce document comptable. Respecte strictement le schéma JSON demandé : dates au format YYYY-MM-DD, montants en nombres décimaux, aucune valeur inventée.`,
+        filePaths: [filePath],
+        schema: schemas[importType]
       });
 
-      if (result.status === 'error') {
-        setUploadResult({ success: false, message: result.details });
-        return;
-      }
-
-      const output = result.output;
       let data = [];
       
       if (importType === 'invoices' && output.invoices) {
@@ -402,95 +411,45 @@ export default function ImportExport() {
       console.error('Import error:', error);
       setUploadResult({ 
         success: false, 
-        message: 'Erreur lors de l\'import: ' + error.message 
+        message: getSupabaseErrorMessage(error, "L'import du fichier a échoué.")
       });
     } finally {
       setUploading(false);
     }
   };
 
+  const fecEntries = useMemo(
+    () => entries.filter((entry) => new Date(entry.date).getFullYear().toString() === fecYear),
+    [entries, fecYear]
+  );
+
+  const fecReport = useMemo(
+    () => validateFec(fecEntries, { year: Number(fecYear) }),
+    [fecEntries, fecYear]
+  );
+
   const handleExportFEC = async () => {
+    if (!fecReport.isValid) {
+      toast.error('Corrigez les anomalies bloquantes avant d\'exporter le FEC.');
+      return;
+    }
+
     setExporting(true);
     try {
-      const yearEntries = entries.filter(e => {
-        const year = new Date(e.date).getFullYear().toString();
-        return year === fecYear;
-      });
+      const rows = buildFecRows(fecEntries, { thirdParties });
+      const content = serializeFec(rows);
 
-      if (yearEntries.length === 0) {
-        toast.error(`Aucune écriture trouvée pour l'exercice ${fecYear}`);
-        setExporting(false);
-        return;
-      }
-
-      // Format FEC officiel avec séparateur pipe
-      const headers = [
-        'JournalCode',
-        'JournalLib',
-        'EcritureNum',
-        'EcritureDate',
-        'CompteNum',
-        'CompteLib',
-        'CompAuxNum',
-        'CompAuxLib',
-        'PieceRef',
-        'PieceDate',
-        'EcritureLib',
-        'Debit',
-        'Credit',
-        'EcritureLet',
-        'DateLet',
-        'ValidDate',
-        'Montantdevise',
-        'Idevise'
-      ];
-
-      const journalLabels = {
-        'AC': 'Achats',
-        'VE': 'Ventes',
-        'BQ': 'Banque',
-        'CA': 'Caisse',
-        'OD': 'Opérations Diverses',
-        'AN': 'À Nouveau'
-      };
-
-      const fecData = yearEntries.map(entry => {
-        const entryDate = format(parseISO(entry.date), 'yyyyMMdd');
-        return [
-          entry.journal || 'OD',
-          journalLabels[entry.journal] || 'Autres',
-          entry.entry_number || '',
-          entryDate,
-          entry.account_code || '',
-          entry.account_label || '',
-          entry.third_party_id || '',
-          entry.third_party_name || '',
-          entry.reference || '',
-          entryDate,
-          entry.label || '',
-          (entry.debit || 0).toFixed(2).replace('.', ','),
-          (entry.credit || 0).toFixed(2).replace('.', ','),
-          entry.lettering || '',
-          '',
-          entry.is_validated ? entryDate : '',
-          '',
-          'EUR'
-        ].join('|');
-      });
-
-      const fecContent = [headers.join('|'), ...fecData].join('\n');
-      const blob = new Blob(['\ufeff' + fecContent], { type: 'text/plain;charset=utf-8;' });
+      const blob = new Blob([`\ufeff${content}`], { type: 'text/plain;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `FEC_${fecYear}_${format(new Date(), 'yyyyMMdd')}.txt`;
+      link.download = fecFileName(company?.siret, `${fecYear}-12-31`);
       link.click();
       URL.revokeObjectURL(url);
-      
-      toast.success(`FEC ${fecYear} exporté avec succès`);
+
+      toast.success(`FEC ${fecYear} exporté (${rows.length} lignes)`);
     } catch (error) {
-      console.error('FEC export error:', error);
-      toast.error('Erreur lors de l\'export FEC');
+      toastSupabaseError(error, "L'export FEC a échoué.");
     } finally {
       setExporting(false);
     }
@@ -981,7 +940,7 @@ export default function ImportExport() {
                     <FileCheck className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
                     <div className="text-sm text-blue-800 leading-relaxed">
                       <p className="font-semibold mb-1">Format FEC conforme</p>
-                      <p>Exportez vos écritures au format txt avec séparateur pipe (|) pour transmission à votre expert-comptable ou à l'administration fiscale.</p>
+                      <p>Fichier texte tabulé, 18 colonnes normalisées, nommé SIRENFECAAAAMMJJ.txt conformément à l&apos;article A47 A-1 du LPF.</p>
                     </div>
                   </div>
                 </div>
@@ -1001,21 +960,48 @@ export default function ImportExport() {
                   </Select>
                 </div>
 
-                <div className="bg-slate-50 rounded-xl p-4 space-y-2 text-sm">
-                  <p className="font-semibold text-slate-700">Contenu du FEC :</p>
-                  <ul className="space-y-1 text-slate-600">
-                    <li>• Code et libellé du journal</li>
-                    <li>• Numéros et dates d'écritures</li>
-                    <li>• Comptes généraux et auxiliaires</li>
-                    <li>• Montants débit/crédit</li>
-                    <li>• Références et lettrage</li>
-                    <li>• Statut de validation</li>
-                  </ul>
+                <div className="rounded-xl border p-4 space-y-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-slate-700">Contrôles de cohérence</p>
+                    {fecReport.isValid ? (
+                      <span className="flex items-center gap-1 text-emerald-700">
+                        <CheckCircle className="h-4 w-4" />
+                        Conforme
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-red-700">
+                        <AlertCircle className="h-4 w-4" />
+                        Export bloqué
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-slate-600">
+                    <span>{fecReport.totals.count} ligne(s)</span>
+                    <span>{fecReport.totals.vouchers ?? 0} pièce(s)</span>
+                    <span>Débit {fecReport.totals.debit.toFixed(2)} €</span>
+                    <span>Crédit {fecReport.totals.credit.toFixed(2)} €</span>
+                  </div>
+
+                  {fecReport.issues.length === 0 ? (
+                    <p className="text-emerald-700">Aucune anomalie détectée.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {fecReport.issues.map((issue) => (
+                        <li
+                          key={issue.code}
+                          className={issue.severity === 'error' ? 'text-red-700' : 'text-amber-700'}
+                        >
+                          {issue.severity === 'error' ? '⛔' : '⚠️'} {issue.message}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
 
                 <Button 
                   onClick={handleExportFEC}
-                  disabled={exporting || entries.length === 0}
+                  disabled={exporting || !fecReport.isValid}
                   className="w-full bg-[#1e3a5f] hover:bg-[#2d4a6f] gap-2"
                 >
                   {exporting ? (

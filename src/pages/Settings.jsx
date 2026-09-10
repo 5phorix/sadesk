@@ -48,7 +48,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import PageHeader from '@/components/common/PageHeader';
-import StatusBadge from '@/components/common/StatusBadge';
+import { toast } from 'sonner';
+import { toastSupabaseError } from '@/lib/supabase-errors';
 import { cn } from '@/lib/utils';
 
 export default function Settings() {
@@ -70,7 +71,14 @@ export default function Settings() {
     accounting_plan: 'PCG',
     fiscal_year_start: '01-01',
     invoice_prefix: 'FAC',
-    invoice_notes: ''
+    invoice_notes: '',
+    rcs: '',
+    iban: '',
+    bic: '',
+    vat_regime: '',
+    tax_regime: '',
+    default_payment_terms: 30,
+    legal_mentions: ''
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -125,7 +133,14 @@ export default function Settings() {
         accounting_plan: currentCompany.accounting_plan || 'PCG',
         fiscal_year_start: currentCompany.fiscal_year_start || '01-01',
         invoice_prefix: currentCompany.invoice_prefix || 'FAC',
-        invoice_notes: currentCompany.invoice_notes || ''
+        invoice_notes: currentCompany.invoice_notes || '',
+        rcs: currentCompany.rcs || '',
+        iban: currentCompany.iban || '',
+        bic: currentCompany.bic || '',
+        vat_regime: currentCompany.vat_regime || '',
+        tax_regime: currentCompany.tax_regime || '',
+        default_payment_terms: currentCompany.default_payment_terms ?? 30,
+        legal_mentions: currentCompany.legal_mentions || ''
       });
     }
   }, [currentCompany]);
@@ -133,13 +148,21 @@ export default function Settings() {
   const handleSaveCompany = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase.from('companies').update(companyData).eq('id', user.active_company_id);
+      const payload = {
+        ...companyData,
+        // Les colonnes contraintes n'acceptent pas la chaine vide.
+        vat_regime: companyData.vat_regime || null,
+        default_payment_terms: Number(companyData.default_payment_terms) || null
+      };
+      const { error } = await supabase.from('companies').update(payload).eq('id', user.active_company_id);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['companies'] });
+      queryClient.invalidateQueries({ queryKey: ['company', user.active_company_id] });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      toast.success('Paramètres enregistrés');
     } catch (error) {
-      console.error('Save error:', error);
+      toastSupabaseError(error, "Les paramètres n'ont pas pu être enregistrés.");
     } finally {
       setSaving(false);
     }
@@ -153,14 +176,15 @@ export default function Settings() {
         ...newFiscalYear,
         year: Number.parseInt(newFiscalYear.start_date.slice(0, 4), 10),
         company_id: user.active_company_id,
-        status: 'ouvert',
+        status: 'open',
         is_current: fiscalYears.length === 0
       });
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['fiscal-years'] });
       setNewFiscalYear({ name: '', start_date: '', end_date: '' });
+      toast.success('Exercice créé');
     } catch (error) {
-      console.error('Create error:', error);
+      toastSupabaseError(error, "L'exercice n'a pas pu être créé.");
     }
   };
 
@@ -184,11 +208,23 @@ export default function Settings() {
 
   const handleCloseFY = async (fy) => {
     try {
-      const { error } = await supabase.from('fiscal_years').update({ status: 'clôturé' }).eq('id', fy.id).eq('company_id', user.active_company_id);
+      const { error } = await supabase.from('fiscal_years').update({ status: 'closed' }).eq('id', fy.id).eq('company_id', user.active_company_id);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['fiscal-years'] });
+      toast.success(`Exercice ${fy.name} clôturé : les écritures de la période sont verrouillées`);
     } catch (error) {
-      console.error('Close error:', error);
+      toastSupabaseError(error, "L'exercice n'a pas pu être clôturé.");
+    }
+  };
+
+  const handleReopenFY = async (fy) => {
+    try {
+      const { error } = await supabase.from('fiscal_years').update({ status: 'open' }).eq('id', fy.id).eq('company_id', user.active_company_id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['fiscal-years'] });
+      toast.success(`Exercice ${fy.name} rouvert`);
+    } catch (error) {
+      toastSupabaseError(error, "L'exercice n'a pas pu être rouvert.");
     }
   };
 
@@ -415,6 +451,79 @@ export default function Settings() {
             </div>
 
             <div className="border-t pt-6">
+              <h4 className="font-medium text-slate-800 mb-4">Identité légale et bancaire</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>RCS</Label>
+                  <Input
+                    value={companyData.rcs}
+                    onChange={(e) => setCompanyData(d => ({ ...d, rcs: e.target.value }))}
+                    placeholder="Paris B 123 456 789"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Régime de TVA</Label>
+                  <Select
+                    value={companyData.vat_regime || 'none'}
+                    onValueChange={(v) => setCompanyData(d => ({ ...d, vat_regime: v === 'none' ? '' : v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Non renseigné" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Non renseigné</SelectItem>
+                      <SelectItem value="franchise">Franchise en base</SelectItem>
+                      <SelectItem value="reel_simplifie">Réel simplifié</SelectItem>
+                      <SelectItem value="reel_normal">Réel normal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Régime fiscal</Label>
+                  <Input
+                    value={companyData.tax_regime}
+                    onChange={(e) => setCompanyData(d => ({ ...d, tax_regime: e.target.value }))}
+                    placeholder="IS, IR..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Délai de paiement par défaut (jours)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={companyData.default_payment_terms}
+                    onChange={(e) => setCompanyData(d => ({ ...d, default_payment_terms: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>IBAN</Label>
+                  <Input
+                    value={companyData.iban}
+                    onChange={(e) => setCompanyData(d => ({ ...d, iban: e.target.value }))}
+                    placeholder="FR76 ..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>BIC</Label>
+                  <Input
+                    value={companyData.bic}
+                    onChange={(e) => setCompanyData(d => ({ ...d, bic: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2 mt-4">
+                <Label>Mentions légales</Label>
+                <Textarea
+                  value={companyData.legal_mentions}
+                  onChange={(e) => setCompanyData(d => ({ ...d, legal_mentions: e.target.value }))}
+                  placeholder="Mentions à faire figurer sur les documents commerciaux..."
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="border-t pt-6">
               <h4 className="font-medium text-slate-800 mb-4">Paramètres de facturation</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -544,7 +653,15 @@ export default function Settings() {
                           {fy.is_current && (
                             <Badge className="bg-blue-500 text-white">En cours</Badge>
                           )}
-                          <StatusBadge status={fy.status} />
+                          <Badge
+                            className={
+                              fy.status === 'closed'
+                                ? 'bg-slate-200 text-slate-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }
+                          >
+                            {fy.status === 'closed' ? 'Clôturé' : 'Ouvert'}
+                          </Badge>
                         </div>
                         <p className="text-sm text-slate-500 mt-1">
                           Du {format(new Date(fy.start_date), 'dd/MM/yyyy')} au {format(new Date(fy.end_date), 'dd/MM/yyyy')}
@@ -552,7 +669,7 @@ export default function Settings() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {!fy.is_current && fy.status === 'ouvert' && (
+                      {!fy.is_current && fy.status === 'open' && (
                         <Button 
                           variant="outline" 
                           size="sm"
@@ -561,13 +678,21 @@ export default function Settings() {
                           Définir comme actif
                         </Button>
                       )}
-                      {fy.status === 'ouvert' && (
+                      {fy.status === 'open' ? (
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => handleCloseFY(fy)}
                         >
                           Clôturer
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleReopenFY(fy)}
+                        >
+                          Rouvrir
                         </Button>
                       )}
                       <Button
