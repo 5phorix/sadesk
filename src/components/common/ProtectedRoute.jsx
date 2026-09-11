@@ -40,19 +40,20 @@ export function ProtectedRoute({ children, requireCompany = true, permission = n
     );
   }
 
-  // Vérifier que company_ids est initialisé
+  // Un nouvel utilisateur peut être authentifié sans société : il doit d'abord
+  // créer sa société ou accepter une invitation.
   if (requireCompany && user && (!user.company_ids || !Array.isArray(user.company_ids) || user.company_ids.length === 0)) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <p className="text-slate-700 mb-4 font-medium">Initialisation en cours...</p>
-          <p className="text-sm text-slate-500 mb-4">Veuillez patienter quelques secondes</p>
+          <p className="text-slate-700 mb-2 font-medium">Aucune société associée à ce compte</p>
+          <p className="text-sm text-slate-500 mb-4">Créez votre société ou rejoignez-la avec une invitation.</p>
           <Button 
-            onClick={() => window.location.reload()}
-            variant="outline"
+            onClick={() => { window.location.href = createPageUrl('CompanySelector'); }}
+            className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
           >
-            Actualiser
+            Créer ou rejoindre une société
           </Button>
         </div>
       </div>

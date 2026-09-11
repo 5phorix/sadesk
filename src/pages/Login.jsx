@@ -9,6 +9,8 @@ export default function Login() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [isResetMode, setIsResetMode] = useState(false);
+  const [isSignupMode, setIsSignupMode] = useState(false);
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (event) => {
@@ -23,12 +25,27 @@ export default function Login() {
       return;
     }
 
+    if (isSignupMode && password !== passwordConfirmation) {
+      setError('Les mots de passe ne correspondent pas.');
+      setIsSubmitting(false);
+      return;
+    }
+
     if (isResetMode) {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/login`
       });
       if (resetError) setError(resetError.message);
       else setMessage('Un lien de réinitialisation a été envoyé si cette adresse existe.');
+    } else if (isSignupMode) {
+      const { data, error: signupError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: `${window.location.origin}/` }
+      });
+      if (signupError) setError(signupError.message);
+      else if (!data.session) setMessage('Votre compte est créé. Consultez votre e-mail pour confirmer votre adresse.');
+      else setMessage('Votre compte est créé.');
     } else {
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) setError(signInError.message);
@@ -42,10 +59,14 @@ export default function Login() {
         <div className="mb-8">
           <p className="text-sm font-medium uppercase tracking-wider text-slate-500">Sadesk Compta</p>
           <h1 className="mt-2 text-2xl font-semibold text-slate-900">
-            {isResetMode ? 'Réinitialiser le mot de passe' : 'Connexion'}
+            {isResetMode ? 'Réinitialiser le mot de passe' : isSignupMode ? 'Créer un compte' : 'Connexion'}
           </h1>
           <p className="mt-2 text-sm text-slate-600">
-            {isResetMode ? 'Recevez un lien de réinitialisation par e-mail.' : 'Accédez à votre espace comptable.'}
+            {isResetMode
+              ? 'Recevez un lien de réinitialisation par e-mail.'
+              : isSignupMode
+                ? 'Créez votre accès à l’espace comptable.'
+                : 'Accédez à votre espace comptable.'}
           </p>
         </div>
 
@@ -76,20 +97,55 @@ export default function Login() {
             </label>
           )}
 
+          {isSignupMode && (
+            <label className="block text-sm font-medium text-slate-700">
+              Confirmer le mot de passe
+              <Input
+                className="mt-2"
+                type="password"
+                value={passwordConfirmation}
+                onChange={(event) => setPasswordConfirmation(event.target.value)}
+                autoComplete="new-password"
+                required
+              />
+            </label>
+          )}
+
           {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
           {message && <p className="text-sm text-emerald-700" role="status">{message}</p>}
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Envoi...' : isResetMode ? 'Envoyer le lien' : 'Se connecter'}
+            {isSubmitting ? 'Envoi...' : isResetMode ? 'Envoyer le lien' : isSignupMode ? 'Créer mon compte' : 'Se connecter'}
           </Button>
 
           <button
             type="button"
             className="w-full text-sm text-slate-600 underline underline-offset-4"
-            onClick={() => { setIsResetMode(!isResetMode); setError(''); setMessage(''); }}
+            onClick={() => {
+              setIsResetMode(!isResetMode);
+              setIsSignupMode(false);
+              setPasswordConfirmation('');
+              setError('');
+              setMessage('');
+            }}
           >
             {isResetMode ? 'Retour à la connexion' : 'Mot de passe oublié ?'}
           </button>
+
+          {!isResetMode && (
+            <button
+              type="button"
+              className="w-full text-sm font-medium text-slate-800 underline underline-offset-4"
+              onClick={() => {
+                setIsSignupMode(!isSignupMode);
+                setPasswordConfirmation('');
+                setError('');
+                setMessage('');
+              }}
+            >
+              {isSignupMode ? 'J’ai déjà un compte' : 'Créer un compte'}
+            </button>
+          )}
         </form>
       </section>
     </main>

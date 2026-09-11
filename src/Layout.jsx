@@ -10,7 +10,6 @@ import {
   BookOpen, 
   BarChart3, 
   Upload, 
-  Download,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -29,6 +28,7 @@ import {
   CalendarCheck,
   Gauge,
   Package,
+  Landmark,
   FolderOpen,
   Globe,
   LogOut,
@@ -48,7 +48,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
 
 const navSections = [
   {
@@ -71,6 +70,8 @@ const navSections = [
       { name: 'Lettrage', icon: Link2, page: 'Lettering' },
       { name: 'Rapprochement bancaire', icon: Calculator, page: 'BankReconciliation' },
       { name: 'États Financiers', icon: FileText, page: 'FinancialStatements' },
+      { name: 'Créances et relances', icon: Bell, page: 'Receivables' },
+      { name: 'Immobilisations', icon: Landmark, page: 'FixedAssets' },
     ]
   },
   {

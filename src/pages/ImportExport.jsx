@@ -4,6 +4,7 @@ import { supabase } from '@/api/supabaseClient';
 import { extractStructuredData, uploadDocument } from '@/api/aiClient';
 import { getSupabaseErrorMessage, toastSupabaseError } from '@/lib/supabase-errors';
 import { buildFecRows, fecFileName, serializeFec, validateFec } from '@/lib/fec';
+import { detectAccountingAnomalies } from '@/lib/accounting';
 import { format } from 'date-fns';
 import { useUser } from '@/components/hooks/useUser';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
@@ -16,9 +17,9 @@ import {
   AlertCircle,
   Loader2,
   Trash2,
-  FileCheck
+  FileCheck,
+  ShieldAlert
 } from 'lucide-react';
-import { createPageUrl } from '../utils';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
@@ -134,6 +135,13 @@ export default function ImportExport() {
     },
     enabled: !!user?.active_company_id,
   });
+
+  const anomalies = useMemo(
+    () => detectAccountingAnomalies(entries, {
+      knownAccountCodes: accounts.map((account) => account.code),
+    }),
+    [entries, accounts]
+  );
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
@@ -671,6 +679,34 @@ export default function ImportExport() {
         title="Import / Export"
         subtitle="Importez et exportez vos données comptables"
       />
+
+      {anomalies.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-900">
+              <ShieldAlert className="h-5 w-5" />
+              Contrôles de cohérence
+              <Badge variant="outline" className="border-amber-300 text-amber-800">
+                {anomalies.length}
+              </Badge>
+            </CardTitle>
+            <CardDescription className="text-amber-800">
+              Ces signaux nécessitent une vérification avant toute correction ou validation.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {anomalies.slice(0, 5).map((anomaly, index) => (
+              <div key={`${anomaly.type}-${index}`} className="flex items-start gap-2 text-sm text-amber-950">
+                <Badge variant="secondary" className="shrink-0">{anomaly.severity}</Badge>
+                <span>{anomaly.message}</span>
+              </div>
+            ))}
+            {anomalies.length > 5 && (
+              <p className="text-xs text-amber-800">{anomalies.length - 5} autre(s) signalement(s)</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-white border border-slate-200">

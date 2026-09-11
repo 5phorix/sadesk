@@ -51,6 +51,12 @@ import PageHeader from '@/components/common/PageHeader';
 import { toast } from 'sonner';
 import { toastSupabaseError } from '@/lib/supabase-errors';
 import { cn } from '@/lib/utils';
+import {
+  DEFAULT_DASHBOARD_PREFERENCES,
+  loadDashboardPreferences,
+  resetDashboardPreferences,
+  saveDashboardPreferences,
+} from '@/lib/dashboardPreferences';
 
 export default function Settings() {
   const { user, loading: loadingUser } = useUser();
@@ -88,6 +94,7 @@ export default function Settings() {
     end_date: ''
   });
   const [deleteFY, setDeleteFY] = useState(null);
+  const [dashboardPreferences, setDashboardPreferences] = useState(DEFAULT_DASHBOARD_PREFERENCES);
 
   const queryClient = useQueryClient();
 
@@ -144,6 +151,22 @@ export default function Settings() {
       });
     }
   }, [currentCompany]);
+
+  useEffect(() => {
+    setDashboardPreferences(loadDashboardPreferences(user?.active_company_id));
+  }, [user?.active_company_id]);
+
+  const updateDashboardPreference = (key, value) => {
+    const next = { ...dashboardPreferences, [key]: value };
+    setDashboardPreferences(next);
+    saveDashboardPreferences(user?.active_company_id, next);
+  };
+
+  const resetDashboard = () => {
+    resetDashboardPreferences(user?.active_company_id);
+    setDashboardPreferences(DEFAULT_DASHBOARD_PREFERENCES);
+    toast.success('Affichage du tableau de bord réinitialisé');
+  };
 
   const handleSaveCompany = async () => {
     setSaving(true);
@@ -273,6 +296,40 @@ export default function Settings() {
         title="Paramètres"
         subtitle={`Configuration de ${currentCompany?.name || 'votre société'}`}
       />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <SettingsIcon className="h-5 w-5" />
+            Personnaliser le tableau de bord
+          </CardTitle>
+          <CardDescription>Choisissez les blocs visibles sur votre tableau de bord.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[
+            ['stats', 'Indicateurs clés', 'Chiffre d’affaires, achats, impayés et factures'],
+            ['evolution', 'Évolution du chiffre d’affaires', 'Graphique des six derniers mois'],
+            ['invoiceSummary', 'Synthèse des factures', 'Factures clients et fournisseurs'],
+            ['alerts', 'Alertes et clients principaux', 'Factures en retard et top clients'],
+            ['recentActivity', 'Activité récente', 'Dernières factures enregistrées'],
+          ].map(([key, label, description]) => (
+            <div key={key} className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+              <div>
+                <p className="font-medium text-slate-800">{label}</p>
+                <p className="text-sm text-slate-500">{description}</p>
+              </div>
+              <Switch
+                checked={dashboardPreferences[key]}
+                onCheckedChange={(checked) => updateDashboardPreference(key, checked)}
+                aria-label={`Afficher ${label}`}
+              />
+            </div>
+          ))}
+          <Button type="button" variant="outline" onClick={resetDashboard}>
+            Réinitialiser l’affichage
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Company Settings */}

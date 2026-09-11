@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { toastSupabaseError } from '@/lib/supabase-errors';
-import { Bell, Mail, Clock, Users, Save } from 'lucide-react';
+import { Bell, Mail, Clock, Save } from 'lucide-react';
 
 export default function NotificationSettings() {
   const { user } = useUser();
@@ -35,7 +35,8 @@ export default function NotificationSettings() {
       invoice_due_soon: true,
       invoice_overdue: true,
       third_party_inactive: true,
-      budget_alert: true
+      budget_alert: true,
+      accounting_anomaly: true
     }
   };
 
@@ -85,7 +86,12 @@ export default function NotificationSettings() {
     },
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      toast.success(response.data.message || 'Notifications générées');
+      const emailMessage = response.email?.reason === 'provider_not_configured'
+        ? ' Les emails restent désactivés : RESEND_API_KEY n’est pas configurée.'
+        : response.email?.sent
+          ? ' Email envoyé.'
+          : '';
+      toast.success(`${response.message || 'Notifications générées'}${emailMessage}`);
     },
     onError: (error) => {
       toastSupabaseError(error, "Les notifications n'ont pas pu être générées.");
@@ -243,6 +249,20 @@ export default function NotificationSettings() {
                   onCheckedChange={(checked) => setFormData({
                     ...formData,
                     enabled_types: { ...formData.enabled_types, budget_alert: checked }
+                  })}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                <div>
+                  <p className="font-medium">Anomalies comptables</p>
+                  <p className="text-xs text-slate-500">Doublons, montants atypiques et comptes inconnus</p>
+                </div>
+                <Switch
+                  checked={formData.enabled_types?.accounting_anomaly}
+                  onCheckedChange={(checked) => setFormData({
+                    ...formData,
+                    enabled_types: { ...formData.enabled_types, accounting_anomaly: checked }
                   })}
                 />
               </div>

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   autoReconcile,
   bestMatch,
+  detectAccountingAnomalies,
+  duplicateEntryAnomalies,
   groupByJournal,
   groupByVoucher,
   isLetterableAccount,
@@ -12,6 +14,8 @@ import {
   reconciliationScore,
   signedAmount,
   suggestLettering,
+  unknownAccountAnomalies,
+  unusualAmountAnomalies,
 } from '@/lib/accounting';
 
 const entry = (overrides = {}) => ({
@@ -32,6 +36,69 @@ const transaction = (overrides = {}) => ({
   reference: 'VIR123',
   amount: 1000,
   ...overrides,
+});
+
+describe('détection des anomalies comptables', () => {
+  it('détecte les lignes strictement dupliquées', () => {
+    const first = entry({ id: 'e1', debit: 125, label: 'Fournitures' });
+    const second = { ...first, id: 'e2' };
+
+    expect(duplicateEntryAnomalies([first, second])).toMatchObject([{
+      type: 'duplicate',
+      severity: 'high',
+      entryIds: ['e1', 'e2']
+    }]);
+  });
+
+  it('ne signale un montant atypique qu avec assez d historique', () => {
+    const entries = [
+      entry({ debit: 100 }),
+      entry({ debit: 110 }),
+      entry({ debit: 90 }),
+      entry({ debit: 2000 })
+    ];
+
+    expect(unusualAmountAnomalies(entries, {
+      minimumAmount: 1000,
+      multipleOfMedian: 5
+    })).toHaveLength(1);
+    expect(unusualAmountAnomalies(entries.slice(0, 2), {
+      minimumAmount: 1000,
+      multipleOfMedian: 5
+    })).toHaveLength(0);
+  });
+
+  it('signale les comptes absents du référentiel fourni', () => {
+    const anomalies = unknownAccountAnomalies([
+      entry({ id: 'e1', account_code: '512000' }),
+      entry({ id: 'e2', account_code: '999999' })
+    ], ['512000']);
+
+    expect(anomalies).toMatchObject([{
+      type: 'unknown_account',
+      entryIds: ['e2']
+    }]);
+  });
+
+  it('agrège les contrôles dans une liste unique', () => {
+    const entries = [
+      entry({ id: 'e1', debit: 100 }),
+      entry({ id: 'e2', debit: 100 }),
+      entry({ id: 'e3', debit: 100 }),
+      entry({ id: 'e4', debit: 2000 }),
+      entry({ id: 'e5', debit: 100, account_code: '999999' })
+    ];
+
+    expect(detectAccountingAnomalies(entries, {
+      knownAccountCodes: ['512000'],
+      minimumAmount: 1000,
+      multipleOfMedian: 5
+    }).map((anomaly) => anomaly.type)).toEqual([
+      'duplicate',
+      'unusual_amount',
+      'unknown_account'
+    ]);
+  });
 });
 
 describe('référentiel journaux', () => {

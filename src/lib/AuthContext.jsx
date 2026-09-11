@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { supabase } from '@/api/supabaseClient';
+import { isSupabaseConfigured, supabase } from '@/api/supabaseClient';
 
 const AuthContext = createContext();
 
@@ -35,6 +35,15 @@ export const AuthProvider = ({ children }) => {
   const checkUserAuth = async () => {
     try {
       setIsLoadingAuth(true);
+
+      if (!isSupabaseConfigured) {
+        setUser(null);
+        setIsAuthenticated(false);
+        setAuthError({ type: 'auth_required', message: 'Supabase is not configured' });
+        setIsLoadingAuth(false);
+        return;
+      }
+
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) throw sessionError;
 
@@ -57,7 +66,7 @@ export const AuthProvider = ({ children }) => {
       const companyIds = (memberships || []).map((membership) => membership.company_id);
       const activeCompanyId = profile?.active_company_id && companyIds.includes(profile.active_company_id)
         ? profile.active_company_id
-        : companyIds[0] || null;
+        : null;
       const activeMembership = (memberships || []).find((membership) => membership.company_id === activeCompanyId);
 
       setUser({

@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
-import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { useUser } from '@/components/hooks/useUser';
 import {
@@ -42,7 +41,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { toastSupabaseError } from '@/lib/supabase-errors';
+import { getSupabaseErrorMessage, toastSupabaseError } from '@/lib/supabase-errors';
 
 const CURRENCIES = [
   { code: 'EUR', name: 'Euro (€)', symbol: '€' },
@@ -65,11 +64,11 @@ const ACCOUNTING_PLANS = [
 ];
 
 export default function CompanySelector() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, updateUser } = useUser();
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [newCompany, setNewCompany] = useState({
     name: '',
     siret: '',
@@ -109,13 +108,12 @@ export default function CompanySelector() {
   });
 
   const handleSelectCompany = async (company) => {
-    const existingIds = user?.company_ids || [];
-    const updatedIds = existingIds.includes(company.id) ? existingIds : [...existingIds, company.id];
-    
-    await updateUser({ 
-      active_company_id: company.id
-    });
-    navigate(createPageUrl('Dashboard'));
+    try {
+      await updateUser({ active_company_id: company.id });
+      window.location.href = createPageUrl('Dashboard');
+    } catch (error) {
+      setCreateError(getSupabaseErrorMessage(error, "La société n'a pas pu être sélectionnée."));
+    }
   };
 
   const handleLogoUpload = async (e) => {
@@ -139,38 +137,21 @@ export default function CompanySelector() {
   const handleCreateCompany = async (e) => {
     e.preventDefault();
     setCreating(true);
+    setCreateError('');
     try {
-      const { data: company, error: companyError } = await supabase.from('companies').insert({
-        ...newCompany,
-        owner_email: user.email,
-        is_active: true
-      }).select().single();
+      const { data: company, error: companyError } = await supabase.rpc(
+        'create_company_for_current_user',
+        { company_data: newCompany }
+      );
       if (companyError) throw companyError;
 
-      const { error: membershipError } = await supabase.from('company_users').insert({
-        company_id: company.id,
-        user_id: user.id,
-        company_name: company.name,
-        user_email: user.email,
-        user_name: user.full_name,
-        role: 'owner',
-        status: 'active',
-        permissions: {
-          invoices: { create: true, read: true, update: true, delete: true },
-          entries: { create: true, read: true, update: true, delete: true },
-          settings: true
-        }
-      });
-      if (membershipError) throw membershipError;
-
-      await updateUser({
-        active_company_id: company.id
-      });
+      await updateUser({ active_company_id: company.id });
 
       queryClient.invalidateQueries({ queryKey: ['companies'] });
-      navigate(createPageUrl('Dashboard'));
+      window.location.href = createPageUrl('Dashboard');
     } catch (error) {
       console.error('Create error:', error);
+      setCreateError(getSupabaseErrorMessage(error, "La société n'a pas pu être créée."));
     } finally {
       setCreating(false);
     }
@@ -383,6 +364,12 @@ export default function CompanySelector() {
           </DialogHeader>
 
           <form onSubmit={handleCreateCompany} className="space-y-6">
+            {createError && (
+              <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+                {createError}
+              </p>
+            )}
+
             {/* Logo */}
             <div className="space-y-2">
               <Label>Logo de la société</Label>

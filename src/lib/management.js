@@ -207,6 +207,32 @@ export function summarizeBudget({
   };
 }
 
+/** Construit une notification idempotente pour chaque seuil atteint. */
+export function buildBudgetNotifications(summaries, { companyId, userId, year }) {
+  return summaries
+    .filter((summary) => summary.status === 'warning' || summary.status === 'alert')
+    .map((summary) => {
+      const percentage = summary.consumptionPercent ?? 0;
+      const isAlert = summary.status === 'alert';
+      const budget = summary.budget;
+
+      return {
+        company_id: companyId,
+        user_id: userId,
+        type: 'budget_alert',
+        priority: isAlert ? 'high' : 'medium',
+        title: isAlert ? 'Budget dépassé' : 'Seuil budgétaire atteint',
+        message: `${budget.name} atteint ${round2(percentage)} % de consommation (${summary.actual.toFixed(2)} € / ${summary.budgeted.toFixed(2)} €).`,
+        related_entity_type: 'budget',
+        related_entity_id: budget.id,
+        related_entity_name: budget.name,
+        action_url: 'BudgetTracking',
+        trigger_date: new Date().toISOString().slice(0, 10),
+        dedupe_key: `${year}:${budget.id}:${summary.status}`,
+      };
+    });
+}
+
 const clampMonth = (month) => Math.min(12, Math.max(1, Math.round(toNumber(month) || 1)));
 
 /**

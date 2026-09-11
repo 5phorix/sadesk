@@ -116,6 +116,100 @@ export function groupByVoucher(entries = []) {
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
 }
 
+const median = (values) => {
+  const sorted = [...values].sort((left, right) => left - right);
+  if (sorted.length === 0) return 0;
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
+};
+
+const duplicateKey = (entry) => [
+  entry.date,
+  entry.journal,
+  entry.entry_number,
+  entry.account_code,
+  entry.label,
+  round2(entry.debit),
+  round2(entry.credit),
+  entry.reference
+].map((value) => String(value ?? '')).join('|');
+
+/** Détecte les lignes strictement identiques, hors identifiant technique. */
+export function duplicateEntryAnomalies(entries = []) {
+  const groups = new Map();
+  entries.forEach((entry) => {
+    const key = duplicateKey(entry);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  });
+
+  return Array.from(groups.values())
+    .filter((group) => group.length > 1)
+    .map((group) => ({
+      type: 'duplicate',
+      severity: 'high',
+      message: `${group.length} lignes identiques détectées pour ${group[0].label || 'une écriture'}.`,
+      entryIds: group.map((entry) => entry.id).filter(Boolean),
+      entries: group
+    }));
+}
+
+/** Signale un montant très supérieur à l'habitude de son compte. */
+export function unusualAmountAnomalies(entries = [], options = {}) {
+  const { minSamples = 3, multipleOfMedian = 10, minimumAmount = 10000 } = options;
+  const byAccount = new Map();
+
+  entries.forEach((entry) => {
+    const amount = Math.abs(signedAmount(entry));
+    if (!entry.account_code || amount <= 0) return;
+    if (!byAccount.has(entry.account_code)) byAccount.set(entry.account_code, []);
+    byAccount.get(entry.account_code).push({ entry, amount });
+  });
+
+  return Array.from(byAccount.entries()).flatMap(([accountCode, values]) => {
+    if (values.length < minSamples) return [];
+    const reference = median(values.map(({ amount }) => amount));
+    if (reference <= 0) return [];
+
+    return values
+      .filter(({ amount }) => amount >= minimumAmount && amount >= reference * multipleOfMedian)
+      .map(({ entry, amount }) => ({
+        type: 'unusual_amount',
+        severity: 'medium',
+        message: `Montant de ${amount.toFixed(2)} € inhabituel sur le compte ${accountCode} (médiane: ${reference.toFixed(2)} €).`,
+        entryIds: entry.id ? [entry.id] : [],
+        entries: [entry]
+      }));
+  });
+}
+
+/** Signale les comptes absents du plan comptable fourni par la société. */
+export function unknownAccountAnomalies(entries = [], knownAccountCodes = []) {
+  const known = new Set(knownAccountCodes.map((code) => String(code).trim()).filter(Boolean));
+  if (known.size === 0) return [];
+
+  return entries
+    .filter((entry) => entry.account_code && !known.has(String(entry.account_code).trim()))
+    .map((entry) => ({
+      type: 'unknown_account',
+      severity: 'medium',
+      message: `Le compte ${entry.account_code} n'est pas présent dans le plan comptable chargé.`,
+      entryIds: entry.id ? [entry.id] : [],
+      entries: [entry]
+    }));
+}
+
+/** Agrège les contrôles proactifs sans modifier les écritures comptables. */
+export function detectAccountingAnomalies(entries = [], options = {}) {
+  return [
+    ...duplicateEntryAnomalies(entries),
+    ...unusualAmountAnomalies(entries, options),
+    ...unknownAccountAnomalies(entries, options.knownAccountCodes)
+  ];
+}
+
 /* -------------------------------------------------------------------------- */
 /* Lettrage                                                                    */
 /* -------------------------------------------------------------------------- */

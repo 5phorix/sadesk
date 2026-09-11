@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_MANAGEMENT_SETTINGS,
   budgetStatus,
+  buildBudgetNotifications,
   buildForecast,
   buildMonthlyComparison,
   closedMonths,
@@ -195,6 +196,38 @@ describe('summarizeBudget', () => {
     expect(summary.projectedVariance.variance).toBe(3600);
     expect(summary.remaining).toBe(9400);
     expect(summary.status).toBe('ok');
+  });
+});
+
+describe('buildBudgetNotifications', () => {
+  it('construit une alerte dedupliquee pour les seuils atteints', () => {
+    const notifications = buildBudgetNotifications([
+      {
+        budget: { id: 'b1', name: 'Fournitures' },
+        status: 'alert',
+        consumptionPercent: 105.5,
+        actual: 1055,
+        budgeted: 1000,
+      },
+      {
+        budget: { id: 'b2', name: 'Conseil' },
+        status: 'ok',
+        consumptionPercent: 40,
+        actual: 400,
+        budgeted: 1000,
+      },
+    ], { companyId: 'c1', userId: 'u1', year: 2026 });
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({
+      company_id: 'c1',
+      user_id: 'u1',
+      type: 'budget_alert',
+      priority: 'high',
+      related_entity_id: 'b1',
+      dedupe_key: '2026:b1:alert',
+    });
+    expect(notifications[0].message).toContain('105.5 %');
   });
 });
 

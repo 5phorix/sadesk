@@ -14,4 +14,13 @@ export default defineConfig({
       '@': path.resolve(rootDir, 'src'),
     },
   },
+  server: {
+    proxy: {
+      '/supabase': {
+        target: 'http://127.0.0.1:54321',
+        changeOrigin: true,
+        rewrite: (requestPath) => requestPath.replace(/^\/supabase/, ''),
+      },
+    },
+  },
 });

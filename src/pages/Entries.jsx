@@ -3,16 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { toastSupabaseError } from '@/lib/supabase-errors';
 import { format, parseISO } from 'date-fns';
-import { fr } from 'date-fns/locale';
 import { 
   Plus, 
   Search,
-  Receipt,
   MoreHorizontal,
   Pencil,
   Trash2,
   CheckCircle,
-  Filter,
   FileText,
   Undo2
 } from 'lucide-react';
@@ -153,20 +150,14 @@ export default function Entries() {
 
   const handleValidate = async (entry) => {
     try {
-      if (entry.entry_number) {
-        // Validation serveur : refuse une pièce dont débits et crédits ne s'équilibrent pas.
-        const { error } = await supabase.rpc('validate_accounting_entry', {
-          target_company_id: entry.company_id,
-          target_entry_number: entry.entry_number
-        });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('accounting_entries')
-          .update({ is_validated: true })
-          .eq('id', entry.id);
-        if (error) throw error;
-      }
+      // Toute validation passe par la RPC : elle contrôle l'équilibre,
+      // le nombre de lignes et les droits avant de verrouiller la pièce.
+      if (!entry.entry_number) throw new Error('Une pièce doit avoir un numéro avant validation.');
+      const { error } = await supabase.rpc('validate_accounting_entry', {
+        target_company_id: entry.company_id,
+        target_entry_number: entry.entry_number
+      });
+      if (error) throw error;
 
       queryClient.invalidateQueries({ queryKey: ['entries'] });
       toast.success('Écriture validée');

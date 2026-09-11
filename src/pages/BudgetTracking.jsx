@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/api/supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@/components/hooks/useUser';
@@ -18,6 +18,7 @@ import {
   MONTH_LABELS,
   SCENARIOS,
   buildForecast,
+  buildBudgetNotifications,
   round2,
   scenarioCoefficient,
   summarizeBudget,
@@ -135,6 +136,24 @@ export default function BudgetTracking() {
         ),
     [budgets, budgetLines, entries, year, settings, coefficient, currentMonth]
   );
+
+  useEffect(() => {
+    if (!user?.active_company_id || !user?.id || summaries.length === 0) return;
+
+    const notifications = buildBudgetNotifications(summaries, {
+      companyId: user.active_company_id,
+      userId: user.id,
+      year,
+    });
+    if (notifications.length === 0) return;
+
+    supabase
+      .from('notifications')
+      .upsert(notifications, { onConflict: 'company_id,dedupe_key' })
+      .then(({ error }) => {
+        if (error) console.error('Budget notification sync failed:', error);
+      });
+  }, [summaries, user, year]);
 
   const totals = useMemo(() => {
     const budgeted = round2(summaries.reduce((total, item) => total + item.budgeted, 0));

@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bell, X, Check, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { Bell, X, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -77,7 +77,10 @@ export default function NotificationBell() {
   const handleNotificationClick = (notification) => {
     markAsReadMutation.mutate(notification.id);
     if (notification.action_url) {
-      window.location.href = `/app/${notification.action_url}`;
+      const actionUrl = notification.action_url.startsWith('/')
+        ? notification.action_url
+        : `/${notification.action_url}`;
+      window.location.href = actionUrl.replace(/^\/app\//, '/');
     }
   };
 
@@ -131,7 +134,7 @@ export default function NotificationBell() {
                           {notification.message}
                         </p>
                         <p className="text-xs text-slate-400 mt-2">
-                          {formatDistanceToNow(new Date(notification.created_date), {
+                          {formatDistanceToNow(new Date(notification.created_at), {
                             addSuffix: true,
                             locale: fr
                           })}

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useInvoices, useAccountingEntries, useThirdParties } from '@/components/hooks/useCompanyData';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
@@ -28,12 +28,18 @@ import StatusBadge from '../components/common/StatusBadge';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { cn } from '@/lib/utils';
+import { loadDashboardPreferences } from '@/lib/dashboardPreferences';
 
 export default function Dashboard() {
   const { user } = useUser();
+  const [preferences, setPreferences] = useState(() => loadDashboardPreferences(user?.active_company_id));
   const { data: invoices = [], isLoading: loadingInvoices } = useInvoices();
   const { data: entries = [], isLoading: loadingEntries } = useAccountingEntries();
   const { data: thirdParties = [] } = useThirdParties();
+
+  useEffect(() => {
+    setPreferences(loadDashboardPreferences(user?.active_company_id));
+  }, [user?.active_company_id]);
 
   // Calculs statistiques mémoïsés
   const stats = useMemo(() => {
@@ -187,8 +193,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {preferences.stats && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all">
           <CardContent className="pt-6">
             <div className="flex items-start justify-between mb-4">
@@ -250,10 +255,9 @@ export default function Dashboard() {
             <p className="text-purple-200/70 text-xs mt-2">{thirdParties.length} tiers actifs</p>
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
-      {/* Graphique évolution CA */}
-      <Card className="shadow-lg border-slate-200">
+      {preferences.evolution && <Card className="shadow-lg border-slate-200">
         <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center justify-between">
             <div>
@@ -293,10 +297,9 @@ export default function Dashboard() {
             </AreaChart>
           </ResponsiveContainer>
         </CardContent>
-      </Card>
+      </Card>}
 
-      {/* Agrégats factures clients/fournisseurs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {preferences.invoiceSummary && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="shadow-lg border-slate-200 overflow-hidden">
           <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-emerald-50 to-white">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -362,9 +365,9 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {preferences.alerts && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Factures en retard */}
         <Card className="shadow-lg border-slate-200 overflow-hidden">
           <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-red-50 to-white">
@@ -448,10 +451,9 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
-      {/* Dernières factures */}
-      <Card className="shadow-lg border-slate-200 overflow-hidden">
+      {preferences.recentActivity && <Card className="shadow-lg border-slate-200 overflow-hidden">
         <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex flex-row items-center justify-between">
           <CardTitle className="text-xl flex items-center gap-2">
             <div className="p-2 bg-slate-100 rounded-lg">
@@ -519,7 +521,7 @@ export default function Dashboard() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
       </div>
     </ProtectedRoute>
   );

@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -9,17 +10,18 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Login from './pages/Login';
+import CompanySelector from './pages/CompanySelector';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 
-const LayoutWrapper = ({ children, currentPageName }) => Layout ?
+const LayoutWrapper = ({ children, currentPageName }) => currentPageName === 'CompanySelector' ? children : Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
   : <>{children}</>;
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, user } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -39,6 +41,10 @@ const AuthenticatedApp = () => {
     }
   }
 
+  if (user && !user.active_company_id) {
+    return <CompanySelector />;
+  }
+
   // Render the main app
   return (
     <Routes>
@@ -50,17 +56,28 @@ const AuthenticatedApp = () => {
         </LayoutWrapper>
       } />
       {Object.entries(Pages).map(([path, Page]) => (
-        <Route
-          key={path}
-          path={`/${path}`}
-          element={
-            <LayoutWrapper currentPageName={path}>
-              <ErrorBoundary key={path}>
-                <Page />
-              </ErrorBoundary>
-            </LayoutWrapper>
-          }
-        />
+        <Fragment key={path}>
+          <Route
+            path={`/${path}`}
+            element={
+              <LayoutWrapper currentPageName={path}>
+                <ErrorBoundary key={path}>
+                  <Page />
+                </ErrorBoundary>
+              </LayoutWrapper>
+            }
+          />
+          <Route
+            path={`/app/${path}`}
+            element={
+              <LayoutWrapper currentPageName={path}>
+                <ErrorBoundary key={`app-${path}`}>
+                  <Page />
+                </ErrorBoundary>
+              </LayoutWrapper>
+            }
+          />
+        </Fragment>
       ))}
       <Route path="*" element={<PageNotFound />} />
     </Routes>

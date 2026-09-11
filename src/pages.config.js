@@ -61,6 +61,7 @@ import Entries from './pages/Entries';
 import FinancialManagement from './pages/FinancialManagement';
 import CashForecast from './pages/CashForecast';
 import FinancialStatements from './pages/FinancialStatements';
+import FixedAssets from './pages/FixedAssets';
 import ImportExport from './pages/ImportExport';
 import Invoices from './pages/Invoices';
 import Journals from './pages/Journals';
@@ -69,6 +70,7 @@ import MonthlyClosing from './pages/MonthlyClosing';
 import NotificationSettings from './pages/NotificationSettings';
 import Profitability from './pages/Profitability';
 import Reports from './pages/Reports';
+import Receivables from './pages/Receivables';
 import RolesManagement from './pages/RolesManagement';
 import ScanInvoice from './pages/ScanInvoice';
 import Settings from './pages/Settings';
@@ -94,6 +96,7 @@ export const PAGES = {
     "FinancialManagement": FinancialManagement,
     "CashForecast": CashForecast,
     "FinancialStatements": FinancialStatements,
+    "FixedAssets": FixedAssets,
     "ImportExport": ImportExport,
     "Invoices": Invoices,
     "Journals": Journals,
@@ -102,6 +105,7 @@ export const PAGES = {
     "NotificationSettings": NotificationSettings,
     "Profitability": Profitability,
     "Reports": Reports,
+    "Receivables": Receivables,
     "RolesManagement": RolesManagement,
     "ScanInvoice": ScanInvoice,
     "Settings": Settings,
