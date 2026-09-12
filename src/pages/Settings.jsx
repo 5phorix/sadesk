@@ -14,8 +14,7 @@ import {
   Loader2,
   CheckCircle,
   Settings as SettingsIcon,
-  Globe,
-  BookOpen
+  Globe
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

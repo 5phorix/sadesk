@@ -8,10 +8,9 @@ import { useThirdParties } from '@/components/hooks/useCompanyData';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import PageHeader from '../components/common/PageHeader';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Camera, Upload, FileText, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
+import { Camera, Upload, FileText, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 
@@ -31,9 +30,6 @@ export default function ScanInvoice() {
   const categories = [
     { value: 'achats', label: 'Achats', icon: '🛒', journal: 'AC', accounts: { expense: '607000', vat: '445660', third: '401000' } },
     { value: 'ventes', label: 'Ventes', icon: '💰', journal: 'VE', accounts: { revenue: '707000', vat: '445710', third: '411000' } },
-    { value: 'impots', label: 'Impôts & Taxes', icon: '🏛️', journal: 'OD', accounts: { expense: '635000', third: '447000' } },
-    { value: 'salaires', label: 'Salaires', icon: '👥', journal: 'OD', accounts: { expense: '641000', third: '421000' } },
-    { value: 'banque', label: 'Opérations bancaires', icon: '🏦', journal: 'BQ', accounts: { bank: '512000' } },
   ];
 
   const handleFileChange = (e) => {
@@ -51,6 +47,8 @@ export default function ScanInvoice() {
     }
   };
 
+  const isIsoDate = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
+
   const handleExtract = async () => {
     if (!file) return;
 
@@ -63,6 +61,16 @@ export default function ScanInvoice() {
     // S'assurer que company_ids est initialisé
     if (!user.company_ids || !Array.isArray(user.company_ids) || user.company_ids.length === 0) {
       toast.error('Initialisation en cours, veuillez réessayer dans quelques secondes');
+      return;
+    }
+
+    const supportedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!supportedTypes.includes(file.type)) {
+      toast.error('Format non supporté : PDF, JPG, PNG, WEBP ou GIF uniquement.');
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error('Le fichier ne doit pas dépasser 15 MB.');
       return;
     }
 
@@ -80,8 +88,9 @@ export default function ScanInvoice() {
         siret: tp.siret
       }));
 
-      // Prompt LLM ultra-professionnel et structuré
-      const prompt = `Tu es un expert comptable professionnel. Analyse cette facture avec PRÉCISION MAXIMALE et extrait CHAQUE élément.
+      // Le scan est volontairement limité aux factures achats/ventes.
+      const documentRole = category === 'ventes' ? 'facture client' : 'facture fournisseur';
+      const prompt = `Tu es un expert comptable professionnel. Analyse cette ${documentRole} avec PRÉCISION MAXIMALE et extrait CHAQUE élément. Ne l'interprète pas comme un relevé bancaire, un bulletin de paie ou un avis d'impôt.
 
 ═══════════════════════════════════════════════════
 SECTION 1: IDENTIFICATION DU DOCUMENT
@@ -101,7 +110,7 @@ SECTION 2: DATES (format YYYY-MM-DD strict)
 ═══════════════════════════════════════════════════
 → DATE D'ÉMISSION: date de la facture
 → DATE D'ÉCHÉANCE: date de paiement (peut être calculée: émission + délai de paiement)
-   Si échéance absente: utilise date émission + 30 jours
+  Si échéance absente: retourne une chaîne vide, ne la déduis pas
 
 ═══════════════════════════════════════════════════
 SECTION 3: MONTANTS FINANCIERS (CRITIQUE)
@@ -147,7 +156,7 @@ RÈGLES TECHNIQUES STRICTES
 ═══════════════════════════════════════════════════
 ✓ Tous les montants = NOMBRES purs (pas de texte, pas d'unités)
 ✓ Dates = format ISO YYYY-MM-DD uniquement
-✓ Si donnée manquante: mettre 0 pour nombres, "" pour textes
+✓ Si donnée obligatoire absente ou illisible: signale l'erreur, n'invente aucune valeur
 ✓ Arrondir les montants à 2 décimales
 ✓ Ne JAMAIS inventer de données, extraire uniquement ce qui est visible`;
 
@@ -181,23 +190,25 @@ RÈGLES TECHNIQUES STRICTES
               }
             }
           },
-          required: ['invoice_number', 'supplier_name', 'amount_ht', 'amount_tva', 'amount_ttc', 'tva_rate']
+          required: ['invoice_number', 'supplier_name', 'date', 'amount_ht', 'amount_tva', 'amount_ttc', 'tva_rate']
         }
       });
 
       if (result) {
-        // VALIDATION PROFESSIONNELLE DES DONNÉES EXTRAITES
-        let amountHt = Math.round((parseFloat(result.amount_ht) || 0) * 100) / 100;
-        let amountTva = Math.round((parseFloat(result.amount_tva) || 0) * 100) / 100;
-        let amountTtc = Math.round((parseFloat(result.amount_ttc) || 0) * 100) / 100;
-        const tvaRate = parseFloat(result.tva_rate) || 20;
+        const amountHt = Math.round(Number(result.amount_ht) * 100) / 100;
+        const amountTva = Math.round(Number(result.amount_tva) * 100) / 100;
+        const amountTtc = Math.round(Number(result.amount_ttc) * 100) / 100;
+        const tvaRate = Number(result.tva_rate);
+
+        if (!result.invoice_number?.trim() || !result.supplier_name?.trim() || !isIsoDate(result.date)
+          || !Number.isFinite(amountHt) || !Number.isFinite(amountTva) || !Number.isFinite(amountTtc)
+          || !Number.isFinite(tvaRate) || amountHt < 0 || amountTva < 0 || amountTtc < 0 || tvaRate < 0 || tvaRate > 100) {
+          throw new Error('Extraction incomplète ou incohérente : vérifiez les champs obligatoires.');
+        }
 
         // COHÉRENCE DES MONTANTS (validation comptable)
-        if (amountTtc > 0 && Math.abs(amountTtc - (amountHt + amountTva)) > 0.50) {
-          // Recalculer HT et TVA si incohérence
-          amountHt = Math.round((amountTtc / (1 + tvaRate / 100)) * 100) / 100;
-          amountTva = Math.round((amountTtc - amountHt) * 100) / 100;
-          toast.warning('Montants recalculés pour cohérence comptable');
+        if (Math.abs(amountTtc - (amountHt + amountTva)) > 0.01) {
+          throw new Error('Extraction incohérente : le TTC doit être égal au HT + TVA.');
         }
 
         // Normalisation complète
@@ -205,8 +216,8 @@ RÈGLES TECHNIQUES STRICTES
           ...result,
           invoice_number: (result.invoice_number || `SCAN-${Date.now()}`).trim(),
           supplier_name: (result.supplier_name || '').trim(),
-          date: result.date || format(new Date(), 'yyyy-MM-dd'),
-          due_date: result.due_date || format(new Date(), 'yyyy-MM-dd'),
+          date: result.date,
+          due_date: isIsoDate(result.due_date) ? result.due_date : null,
           description: (result.description || '').trim(),
           amount_ht: amountHt,
           amount_tva: amountTva,
@@ -214,10 +225,10 @@ RÈGLES TECHNIQUES STRICTES
           tva_rate: tvaRate,
           items: (result.items || []).map(item => ({
             description: (item.description || 'Article').trim(),
-            quantity: Math.round((parseFloat(item.quantity) || 1) * 100) / 100,
-            unit_price: Math.round((parseFloat(item.unit_price) || 0) * 100) / 100,
-            vat_rate: parseFloat(item.vat_rate) || tvaRate,
-            total_ht: Math.round((parseFloat(item.total_ht) || 0) * 100) / 100
+            quantity: Number(item.quantity),
+            unit_price: Number(item.unit_price),
+            vat_rate: Number(item.vat_rate),
+            total_ht: Number(item.total_ht)
           }))
         };
         
@@ -422,7 +433,7 @@ RÈGLES TECHNIQUES STRICTES
           tva_rate: parseFloat(extractedData.tva_rate) || 20,
           amount_tva: parseFloat(extractedData.amount_tva) || 0,
           amount_ttc: parseFloat(extractedData.amount_ttc) || 0,
-          status: 'validee',
+          status: 'brouillon',
           file_path: extractedData.file_path,
           file_url: extractedData.file_url
         })

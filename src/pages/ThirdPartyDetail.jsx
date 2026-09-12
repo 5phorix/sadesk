@@ -57,7 +57,8 @@ export default function ThirdPartyDetail() {
         .from('invoices')
         .select('*')
         .eq('company_id', user.active_company_id)
-        .eq('third_party_id', thirdPartyId);
+        .eq('third_party_id', thirdPartyId)
+        .eq('is_validated', true);
       if (error) throw error;
       return data;
     },

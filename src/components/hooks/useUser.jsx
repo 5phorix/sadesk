@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/api/supabaseClient';
 
+export function resolveActiveCompanyId(profileCompanyId, companyIds = []) {
+  return profileCompanyId && companyIds.includes(profileCompanyId) ? profileCompanyId : null;
+}
+
 /**
  * Hook centralisé pour gérer l'utilisateur et s'assurer que company_ids est toujours un array
  * Évite les erreurs "$in needs an array" en initialisant correctement company_ids
@@ -29,9 +33,7 @@ export function useUser() {
       if (membershipsError) throw membershipsError;
 
       const companyIds = (memberships || []).map((membership) => membership.company_id);
-      const activeCompanyId = profile?.active_company_id && companyIds.includes(profile.active_company_id)
-        ? profile.active_company_id
-        : companyIds[0] || null;
+      const activeCompanyId = resolveActiveCompanyId(profile?.active_company_id, companyIds);
       const activeMembership = (memberships || []).find((membership) => membership.company_id === activeCompanyId);
 
       setUser({

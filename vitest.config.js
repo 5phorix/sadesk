@@ -12,7 +12,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['tests/**/*.test.js'],
+    include: ['tests/**/*.test.{js,jsx}'],
     setupFiles: ['tests/setup-env.js'],
     // Les tests d'integration partagent une base Supabase : pas de parallelisme.
     fileParallelism: false,

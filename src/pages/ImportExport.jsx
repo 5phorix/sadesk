@@ -5,6 +5,7 @@ import { extractStructuredData, uploadDocument } from '@/api/aiClient';
 import { getSupabaseErrorMessage, toastSupabaseError } from '@/lib/supabase-errors';
 import { buildFecRows, fecFileName, serializeFec, validateFec } from '@/lib/fec';
 import { detectAccountingAnomalies } from '@/lib/accounting';
+import { duplicateIndexes, duplicateKey, normalizeDuplicateValue } from '@/lib/import-validation';
 import { format } from 'date-fns';
 import { useUser } from '@/components/hooks/useUser';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
@@ -21,6 +22,7 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import {
@@ -160,15 +162,21 @@ export default function ImportExport() {
     }
 
     // Vérifier la taille selon le type de fichier
-    const isPDF = file.name.toLowerCase().endsWith('.pdf');
-    const maxSize = isPDF ? 10 * 1024 * 1024 : 50 * 1024 * 1024; // 10MB pour PDF, 50MB pour autres
+    const supportedAiTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const maxSize = 15 * 1024 * 1024;
+
+    if (!supportedAiTypes.includes(file.type)) {
+      setUploadResult({
+        success: false,
+        message: 'Ce parcours IA accepte uniquement les PDF et images JPG, PNG, WEBP ou GIF.'
+      });
+      return;
+    }
     
     if (file.size > maxSize) {
       setUploadResult({ 
         success: false, 
-        message: isPDF 
-          ? `Les fichiers PDF sont limités à 10 MB (votre fichier: ${(file.size / 1024 / 1024).toFixed(1)} MB). Essayez de réduire la qualité ou diviser le document.`
-          : `Le fichier est trop volumineux (${(file.size / 1024 / 1024).toFixed(1)} MB). La taille maximale est de 50 MB.`
+        message: `Le fichier est trop volumineux (${(file.size / 1024 / 1024).toFixed(1)} MB). La taille maximale pour l'analyse IA est de 15 MB.`
       });
       return;
     }
@@ -177,7 +185,7 @@ export default function ImportExport() {
     setUploadResult(null);
 
     try {
-      const { path: filePath } = await uploadDocument(file, user.active_company_id);
+      const { path: filePath, url: fileUrl } = await uploadDocument(file, user.active_company_id);
 
       const schemas = {
         invoices: {
@@ -189,16 +197,18 @@ export default function ImportExport() {
                 type: 'object',
                 properties: {
                   invoice_number: { type: 'string' },
-                  type: { type: 'string' },
+                  type: { type: 'string', enum: ['client', 'fournisseur'] },
                   date: { type: 'string' },
                   due_date: { type: 'string' },
                   third_party_name: { type: 'string' },
                   description: { type: 'string' },
                   amount_ht: { type: 'number' },
+                  amount_tva: { type: 'number' },
                   tva_rate: { type: 'number' },
                   amount_ttc: { type: 'number' },
                   status: { type: 'string' }
-                }
+                },
+                required: ['invoice_number', 'date', 'third_party_name', 'amount_ht', 'amount_tva', 'amount_ttc', 'tva_rate']
               }
             }
           }
@@ -221,7 +231,8 @@ export default function ImportExport() {
                   city: { type: 'string' },
                   siret: { type: 'string' },
                   tva_number: { type: 'string' }
-                }
+                },
+                required: ['name']
               }
             }
           }
@@ -234,6 +245,7 @@ export default function ImportExport() {
               items: {
                 type: 'object',
                 properties: {
+                  entry_number: { type: 'string' },
                   date: { type: 'string' },
                   journal: { type: 'string' },
                   account_code: { type: 'string' },
@@ -242,7 +254,8 @@ export default function ImportExport() {
                   debit: { type: 'number' },
                   credit: { type: 'number' },
                   reference: { type: 'string' }
-                }
+                },
+                required: ['entry_number', 'date', 'journal', 'account_code', 'label', 'debit', 'credit']
               }
             }
           }
@@ -260,7 +273,8 @@ export default function ImportExport() {
                   class: { type: 'string' },
                   type: { type: 'string' },
                   category: { type: 'string' }
-                }
+                },
+                required: ['code', 'label']
               }
             }
           }
@@ -269,7 +283,7 @@ export default function ImportExport() {
 
       const output = await extractStructuredData({
         companyId: user.active_company_id,
-        prompt: `Extrais l'intégralité des lignes de type "${importType}" présentes dans ce document comptable. Respecte strictement le schéma JSON demandé : dates au format YYYY-MM-DD, montants en nombres décimaux, aucune valeur inventée.`,
+        prompt: `Le document est destiné à l'import de ${importType}. Extrais uniquement les données de ce type, sans mélanger d'autres types. Respecte strictement le schéma JSON : dates YYYY-MM-DD et montants numériques. N'invente aucune donnée ; si un champ obligatoire est illisible, retourne une erreur plutôt qu'une valeur de remplacement.`,
         filePaths: [filePath],
         schema: schemas[importType]
       });
@@ -298,19 +312,22 @@ export default function ImportExport() {
       if (importType === 'invoices') {
         // Charger les factures existantes pour vérifier les doublons
         const existingInvoices = invoices;
+        const existingInvoiceNumbers = new Set(existingInvoices.map((invoice) => normalizeDuplicateValue(invoice.invoice_number)));
+        const duplicateRows = duplicateIndexes(data, (item) => normalizeDuplicateValue(item.invoice_number));
         
-        for (const item of data) {
+        for (const [index, item] of data.entries()) {
+          if (duplicateRows.has(index)) {
+            skipped++;
+            skippedDetails.push(`${item.invoice_number || 'Facture sans numéro'} (doublon dans le fichier)`);
+            return;
+          }
           if (item.invoice_number && item.third_party_name) {
-            // Vérifier si la facture existe déjà
-            const duplicate = existingInvoices.find(
-              inv => inv.invoice_number === item.invoice_number && 
-                     inv.third_party_name === item.third_party_name
-            );
-            
-            if (duplicate) {
+            const invoiceNumber = normalizeDuplicateValue(item.invoice_number);
+            const duplicate = existingInvoices.find((inv) => normalizeDuplicateValue(inv.invoice_number) === invoiceNumber);
+            if (duplicate || existingInvoiceNumbers.has(invoiceNumber)) {
               skipped++;
               skippedDetails.push(`${item.invoice_number} (existe depuis le ${format(new Date(duplicate.date), 'dd/MM/yyyy')})`);
-              continue;
+              return;
             }
             
             const { error } = await supabase.from('invoices').insert({
@@ -322,22 +339,28 @@ export default function ImportExport() {
               tva_rate: item.tva_rate || 20,
               status: item.status || 'brouillon',
               type: item.type || 'fournisseur',
-              file_url: file_url
+              file_url: fileUrl
             });
             if (error) throw error;
             created++;
+            existingInvoiceNumbers.add(invoiceNumber);
           }
         }
       } else if (importType === 'thirdparties') {
         // Charger les tiers existants pour vérifier les doublons
         const existingThirdParties = thirdParties;
+        const existingThirdPartyCodes = new Set(existingThirdParties.map((party) => normalizeDuplicateValue(party.code)));
+        const duplicateRows = duplicateIndexes(data, (item) => normalizeDuplicateValue(item.code));
         
-        for (const item of data) {
+        for (const [index, item] of data.entries()) {
+          if (duplicateRows.has(index)) {
+            skipped++;
+            skippedDetails.push(`${item.code || item.name} (doublon dans le fichier)`);
+            continue;
+          }
           if (item.code && item.name) {
             // Vérifier si le tiers existe déjà
-            const duplicate = existingThirdParties.find(
-              tp => tp.code === item.code
-            );
+            const duplicate = existingThirdPartyCodes.has(normalizeDuplicateValue(item.code));
             
             if (duplicate) {
               skipped++;
@@ -353,33 +376,49 @@ export default function ImportExport() {
             });
             if (error) throw error;
             created++;
+            existingThirdPartyCodes.add(normalizeDuplicateValue(item.code));
           }
         }
       } else if (importType === 'entries') {
+        const existingEntryNumbers = new Set(entries.map((entry) => normalizeDuplicateValue(entry.entry_number)));
+        const importedEntryNumbers = new Set();
         for (const item of data) {
           if (item.date && item.account_code && item.label) {
+            const entryNumber = item.entry_number || `IMP-${Date.now()}-${created}`;
+            const normalizedEntryNumber = normalizeDuplicateValue(entryNumber);
+            if (item.entry_number && (existingEntryNumbers.has(normalizedEntryNumber) || importedEntryNumbers.has(normalizedEntryNumber))) {
+              skipped++;
+              skippedDetails.push(`${item.entry_number} (pièce déjà présente ou répétée)`);
+              continue;
+            }
             const { error } = await supabase.from('accounting_entries').insert({
               ...item,
               company_id: user.active_company_id,
-              entry_number: item.entry_number || `IMP-${Date.now()}-${created}`,
+              entry_number: entryNumber,
               debit: parseFloat(item.debit) || 0,
               credit: parseFloat(item.credit) || 0,
               is_validated: false
             });
             if (error) throw error;
             created++;
+            if (item.entry_number) importedEntryNumbers.add(normalizedEntryNumber);
           }
         }
       } else if (importType === 'accounts') {
         // Charger les comptes existants pour vérifier les doublons
         const existingAccounts = accounts;
+        const existingAccountCodes = new Set(existingAccounts.map((account) => normalizeDuplicateValue(account.code)));
+        const duplicateRows = duplicateIndexes(data, (item) => normalizeDuplicateValue(item.code));
         
-        for (const item of data) {
+        for (const [index, item] of data.entries()) {
+          if (duplicateRows.has(index)) {
+            skipped++;
+            skippedDetails.push(`${item.code || item.label} (doublon dans le fichier)`);
+            continue;
+          }
           if (item.code && item.label) {
             // Vérifier si le compte existe déjà
-            const duplicate = existingAccounts.find(
-              acc => acc.code === item.code
-            );
+            const duplicate = existingAccountCodes.has(normalizeDuplicateValue(item.code));
             
             if (duplicate) {
               skipped++;
@@ -396,6 +435,7 @@ export default function ImportExport() {
             });
             if (error) throw error;
             created++;
+            existingAccountCodes.add(normalizeDuplicateValue(item.code));
           }
         }
       }
@@ -508,6 +548,15 @@ export default function ImportExport() {
       const headers = lines[0].split('|').map(h => h.trim());
       let created = 0;
       let skipped = 0;
+      const existingEntryKeys = new Set(entries.map((entry) => duplicateKey(
+        entry.date,
+        entry.entry_number,
+        entry.account_code,
+        entry.label,
+        entry.debit,
+        entry.credit
+      )));
+      const importedEntryKeys = new Set();
 
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split('|');
@@ -521,17 +570,29 @@ export default function ImportExport() {
         // Convertir les dates du format AAAAMMJJ vers AAAA-MM-JJ
         const dateStr = entry.EcritureDate;
         const formattedDate = `${dateStr.substring(0,4)}-${dateStr.substring(4,6)}-${dateStr.substring(6,8)}`;
+        const debit = parseFloat(entry.Debit.replace(',', '.')) || 0;
+        const credit = parseFloat(entry.Credit.replace(',', '.')) || 0;
+        const importKey = duplicateKey(formattedDate, entry.EcritureNum, entry.CompteNum, entry.EcritureLib, debit, credit);
+
+        if (existingEntryKeys.has(importKey) || importedEntryKeys.has(importKey)) {
+          skipped++;
+          continue;
+        }
+        importedEntryKeys.add(importKey);
 
         const { error } = await supabase.from('accounting_entries').insert({
           company_id: user.active_company_id,
           entry_number: entry.EcritureNum,
           date: formattedDate,
+          piece_date: entry.PieceDate
+            ? `${entry.PieceDate.substring(0, 4)}-${entry.PieceDate.substring(4, 6)}-${entry.PieceDate.substring(6, 8)}`
+            : formattedDate,
           journal: entry.JournalCode,
           account_code: entry.CompteNum,
           account_label: entry.CompteLib,
           label: entry.EcritureLib,
-          debit: parseFloat(entry.Debit.replace(',', '.')) || 0,
-          credit: parseFloat(entry.Credit.replace(',', '.')) || 0,
+          debit,
+          credit,
           reference: entry.PieceRef,
           third_party_name: entry.CompAuxLib,
           lettering: entry.EcritureLet,
@@ -804,7 +865,7 @@ export default function ImportExport() {
                             Glissez un fichier ou cliquez pour sélectionner
                           </p>
                           <p className="text-xs text-slate-400 mt-1">
-                            CSV, Excel, PDF (mono ou multi-pages)
+                            PDF ou image (JPG, PNG, WEBP, GIF)
                           </p>
                         </>
                       )}
@@ -812,7 +873,7 @@ export default function ImportExport() {
                     <input
                       type="file"
                       className="hidden"
-                      accept=".csv,.xlsx,.xls,.pdf"
+                      accept=".pdf,image/jpeg,image/png,image/webp,image/gif"
                       onChange={handleFileUpload}
                       disabled={uploading}
                     />

@@ -1,7 +1,5 @@
 import React, { memo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown } from 'lucide-react';
 
 const variants = {
   default: 'bg-white',

@@ -13,7 +13,6 @@ import {
   Trash2, 
   Search,
   FileText,
-  Filter,
   Loader2,
   FolderOpen
 } from 'lucide-react';

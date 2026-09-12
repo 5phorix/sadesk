@@ -1,12 +1,29 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.SUPABASE_TEST_URL || process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_TEST_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+const SUPABASE_URL =
+  process.env.SUPABASE_PUBLIC_URL ||
+  process.env.SUPABASE_SECRET_URL ||
+  process.env.SUPABASE_TEST_URL ||
+  process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  process.env.SUPABASE_TEST_ANON_KEY ||
+  process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_TEST_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_TEST_SERVICE_ROLE_KEY;
+
+const isValidSupabaseUrl = (() => {
+  try {
+    const url = new URL(SUPABASE_URL || '');
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+})();
 
 export const isIntegrationConfigured = Boolean(
-  SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_SERVICE_ROLE_KEY
+  isValidSupabaseUrl && SUPABASE_ANON_KEY && SUPABASE_SERVICE_ROLE_KEY
 );
 
 /** Client service_role : contourne RLS, uniquement pour preparer/nettoyer les fixtures. */

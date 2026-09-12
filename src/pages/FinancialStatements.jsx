@@ -6,9 +6,8 @@ import PageHeader from '@/components/common/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, TrendingUp, AlertCircle } from 'lucide-react';
+import { TrendingUp, AlertCircle } from 'lucide-react';
 import AmountDisplay from '@/components/common/AmountDisplay';
-import { startOfYear, endOfYear } from 'date-fns';
 
 export default function FinancialStatements() {
   const { user } = useUser();
@@ -16,7 +15,7 @@ export default function FinancialStatements() {
 
   const { data: entries = [] } = useQuery({
     queryKey: ['entries', user?.active_company_id],
-    queryFn: async () => { const { data, error } = await supabase.from('accounting_entries').select('*').eq('company_id', user.active_company_id); if (error) throw error; return data; },
+    queryFn: async () => { const { data, error } = await supabase.from('accounting_entries').select('*').eq('company_id', user.active_company_id).eq('is_validated', true); if (error) throw error; return data; },
     enabled: !!user?.active_company_id
   });
 

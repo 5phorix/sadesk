@@ -19,7 +19,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { X, Upload, Loader2 } from 'lucide-react';
+import { Upload, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 const TVA_RATES = [0, 5.5, 10, 20];
@@ -144,6 +144,16 @@ export default function InvoiceForm({ open, onClose, invoice, onSave }) {
         amount_ttc: parseFloat(formData.amount_ttc) || 0,
         tva_rate: parseFloat(formData.tva_rate) || 20
       };
+
+      const { data: duplicate, error: duplicateError } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('company_id', user.active_company_id)
+        .eq('invoice_number', data.invoice_number)
+        .neq('id', invoice?.id || '00000000-0000-0000-0000-000000000000')
+        .maybeSingle();
+      if (duplicateError) throw duplicateError;
+      if (duplicate) throw new Error(`La facture ${data.invoice_number} existe déjà dans cette société.`);
       
       if (invoice) {
         const { error } = await supabase.from('invoices').update(data).eq('id', invoice.id);

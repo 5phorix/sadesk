@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '@/api/supabaseClient';
 import { extractStructuredData, uploadDocument } from '@/api/aiClient';
 import { toastSupabaseError } from '@/lib/supabase-errors';
+import { duplicateKey } from '@/lib/import-validation';
 import { useUser } from '@/components/hooks/useUser';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -139,6 +140,20 @@ RÈGLES TECHNIQUES
 
     setLoading(true);
     try {
+      const { data: existingTransactions, error: existingError } = await supabase
+        .from('bank_transactions')
+        .select('bank_account, transaction_date, amount, reference, description')
+        .eq('company_id', user.active_company_id);
+      if (existingError) throw existingError;
+
+      const existingKeys = new Set((existingTransactions || []).map((transaction) => duplicateKey(
+        transaction.bank_account,
+        transaction.transaction_date,
+        transaction.amount,
+        transaction.reference,
+        transaction.description
+      )));
+      const importedKeys = new Set();
       const transactions = preview.map((transaction) => ({
           company_id: user.active_company_id,
           bank_account: bankAccount,
@@ -149,12 +164,28 @@ RÈGLES TECHNIQUES
           amount: parseFloat(transaction.amount) || 0,
           balance_after: parseFloat(transaction.balance_after) || 0,
           is_reconciled: false
-      }));
+      })).filter((transaction) => {
+        const key = duplicateKey(
+          transaction.bank_account,
+          transaction.transaction_date,
+          transaction.amount,
+          transaction.reference,
+          transaction.description
+        );
+        if (existingKeys.has(key) || importedKeys.has(key)) return false;
+        importedKeys.add(key);
+        return true;
+      });
+
+      if (transactions.length === 0) {
+        toast.info('Toutes les transactions de ce relevé existent déjà.');
+        return;
+      }
       const { error } = await supabase.from('bank_transactions').insert(transactions);
       if (error) throw error;
 
       queryClient.invalidateQueries({ queryKey: ['bankTransactions'] });
-      toast.success(`${preview.length} transactions importées`);
+      toast.success(`${transactions.length} transactions importées${transactions.length < preview.length ? `, ${preview.length - transactions.length} doublon(s) ignoré(s)` : ''}`);
       setFile(null);
       setPreview(null);
     } catch (error) {

@@ -34,10 +34,10 @@ import { toastSupabaseError } from '@/lib/supabase-errors';
 const PERMISSION_MODULES = [
   { key: 'invoices', label: 'Facturation', permissions: ['create', 'read', 'update', 'delete'] },
   { key: 'entries', label: 'Écritures comptables', permissions: ['create', 'read', 'update', 'delete', 'validate'] },
-  { key: 'third_parties', label: 'Tiers', permissions: ['create', 'read', 'update', 'delete'] },
-  { key: 'bank_reconciliation', label: 'Rapprochement bancaire', permissions: ['access', 'reconcile'] },
-  { key: 'reports', label: 'Rapports', permissions: ['view', 'export'] },
-  { key: 'budget', label: 'Budget', permissions: ['view', 'manage'] }
+  { key: 'thirdparties', label: 'Tiers', permissions: ['create', 'read', 'update', 'delete'] },
+  { key: 'bank', label: 'Banque', permissions: ['create', 'read', 'update', 'delete'] },
+  { key: 'reports', label: 'Rapports', permissions: ['read', 'export'] },
+  { key: 'budgets', label: 'Budget', permissions: ['create', 'read', 'update', 'delete'] }
 ];
 
 const PERMISSION_LABELS = {
@@ -46,11 +46,7 @@ const PERMISSION_LABELS = {
   update: 'Modifier',
   delete: 'Supprimer',
   validate: 'Valider',
-  access: 'Accéder',
-  reconcile: 'Rapprocher',
-  view: 'Voir',
-  export: 'Exporter',
-  manage: 'Gérer'
+  export: 'Exporter'
 };
 
 export default function RolesManagement() {

@@ -4,7 +4,7 @@ import { supabase } from '@/api/supabaseClient';
 import { useUser } from '@/components/hooks/useUser';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import AmountDisplay from '@/components/common/AmountDisplay';
-import { startOfMonth, endOfMonth, startOfYear, format, parseISO } from 'date-fns';
+import { startOfMonth, endOfMonth, startOfYear, format } from 'date-fns';
 
 export default function RevenueWidget({ config = {} }) {
   const { user } = useUser();

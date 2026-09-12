@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
@@ -6,8 +6,7 @@ import {
   Settings, 
   Trash2, 
   GripVertical,
-  Calendar,
-  Filter
+  Calendar
 } from 'lucide-react';
 import {
   DropdownMenu,

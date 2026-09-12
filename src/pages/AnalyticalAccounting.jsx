@@ -27,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Target, TrendingUp, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Target, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import AmountDisplay from '@/components/common/AmountDisplay';
 import { cn } from '@/lib/utils';
@@ -55,7 +55,7 @@ export default function AnalyticalAccounting() {
   const { data: entries = [] } = useQuery({
     queryKey: ['entries', user?.active_company_id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('accounting_entries').select('*').eq('company_id', user.active_company_id).order('date', { ascending: false }).limit(5000);
+      const { data, error } = await supabase.from('accounting_entries').select('*').eq('company_id', user.active_company_id).eq('is_validated', true).order('date', { ascending: false }).limit(5000);
       if (error) throw error;
       return data;
     },

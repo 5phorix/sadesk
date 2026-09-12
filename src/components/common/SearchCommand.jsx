@@ -12,7 +12,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { FileText, Users, Receipt, BookOpen, Search } from 'lucide-react';
+import { FileText, Users, Receipt } from 'lucide-react';
 
 export default function SearchCommand({ open, onOpenChange }) {
   const navigate = useNavigate();

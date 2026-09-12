@@ -204,6 +204,7 @@ export function useYearEntries(year) {
           'id, date, journal, account_code, account_label, label, debit, credit, is_validated, third_party_id, third_party_name, cost_center_code, cost_center_name'
         )
         .eq('company_id', companyId)
+        .eq('is_validated', true)
         .gte('date', `${year}-01-01`)
         .lte('date', `${year}-12-31`)
         .order('date');

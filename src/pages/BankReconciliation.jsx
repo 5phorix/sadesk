@@ -6,18 +6,15 @@ import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import PageHeader from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Upload,
-  Link2,
   CheckCircle2,
   XCircle,
   Search,
   Filter,
-  RefreshCw,
-  Download
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { toastSupabaseError } from '@/lib/supabase-errors';

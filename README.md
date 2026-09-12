@@ -34,6 +34,25 @@ Les migrations se trouvent dans `supabase/migrations/`. Appliquez-les avec :
 supabase db push
 ```
 
+Pour appliquer les migrations sur un projet distant, authentifiez puis liez la CLI :
+
+```bash
+npx supabase login
+npx supabase link --project-ref <project-ref>
+npx supabase db push
+```
+
+Pour activer le job d'intégration GitHub, créez les trois secrets dans les paramètres du dépôt. La commande `gh secret set` demande chaque valeur de façon masquée :
+
+```bash
+gh auth login
+gh secret set SUPABASE_PUBLIC_URL
+gh secret set SUPABASE_PUBLISHABLE_KEY
+gh secret set SUPABASE_SERVICE_ROLE_KEY
+```
+
+Les tests locaux lisent ces noms depuis `.env.test.local`, qui ne doit jamais être commitée. `SUPABASE_SECRET_URL` reste accepté comme alias d'URL, mais une URL n'est pas une clé secrète.
+
 **Scripts**
 
 | Commande | Description |
@@ -41,8 +60,13 @@ supabase db push
 | `npm run dev` | Serveur de développement |
 | `npm run build` | Build de production |
 | `npm run lint` | Analyse ESLint |
+| `npm run typecheck` | Vérification de configuration JSX et des modules |
 | `npm run test` | Tests unitaires (Vitest) |
+| `npm run test:unit` | Tests unitaires autonomes, dont le smoke test RTL |
 | `npm run test:integration` | Tests d'isolation multi-sociétés et de rôles (nécessite une base Supabase de test) |
+| `npm run test:e2e` | Smoke test navigateur Playwright |
+
+Le projet est en JavaScript/JSX : `npm run typecheck` vérifie la résolution des modules et la compilation JSX. ESLint porte les diagnostics JavaScript (`npm run lint`).
 
 **Tests d'intégration**
 

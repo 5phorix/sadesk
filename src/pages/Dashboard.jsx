@@ -1,20 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useInvoices, useAccountingEntries, useThirdParties } from '@/components/hooks/useCompanyData';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { useUser } from '@/components/hooks/useUser';
-import PageHeader from '../components/common/PageHeader';
-import StatCard from '../components/dashboard/StatCard';
 import { 
-  Euro, 
   TrendingUp, 
   TrendingDown, 
   FileText,
-  Calendar,
   AlertCircle,
   ArrowUpRight,
   ArrowDownRight,
-  Wallet,
   Users,
   BarChart3
 } from 'lucide-react';
@@ -22,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import AmountDisplay from '../components/common/AmountDisplay';
 import StatusBadge from '../components/common/StatusBadge';
 import { Link } from 'react-router-dom';

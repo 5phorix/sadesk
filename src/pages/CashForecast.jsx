@@ -11,7 +11,7 @@ import AmountDisplay from '@/components/common/AmountDisplay';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, ArrowDownRight, ArrowUpRight, CalendarClock, Droplets, Gauge, Landmark, ShieldAlert, TrendingUp } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, CalendarClock, Gauge, Landmark, ShieldAlert, TrendingUp } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { addDays, differenceInDays, format, startOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';

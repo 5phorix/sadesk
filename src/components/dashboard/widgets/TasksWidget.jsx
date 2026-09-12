@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useUser } from '@/components/hooks/useUser';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, Circle, Clock, Calendar } from 'lucide-react';
+import { Circle, Clock, Calendar } from 'lucide-react';
 import { format, parseISO, isPast } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { createPageUrl } from '@/utils';

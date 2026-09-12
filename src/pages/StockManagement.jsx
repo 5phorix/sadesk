@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, AlertTriangle, Package, TrendingDown } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, Package } from 'lucide-react';
 import AmountDisplay from '@/components/common/AmountDisplay';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
 import DataTable from '../components/common/DataTable';
@@ -10,7 +10,7 @@ import InvoiceExportPDF from '../components/invoices/InvoiceExportPDF';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Filter, Download, Upload, X, Trash2, Receipt } from 'lucide-react';
+import { Plus, Search, Trash2, Receipt } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
