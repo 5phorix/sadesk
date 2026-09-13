@@ -6,7 +6,7 @@ Cette checklist couvre les éléments restant à traiter avant de déclarer Sade
 
 ### Secrets et configuration
 
-- [ ] Confirmer les secrets GitHub dans `Settings > Secrets and variables > Actions`.
+- [ ] Confirmer les secrets GitHub dans `Settings > Secrets and variables > Actions` (non observable depuis ce terminal).
 - [ ] Configurer `SUPABASE_PUBLIC_URL`.
 - [ ] Configurer `SUPABASE_PUBLISHABLE_KEY`.
 - [ ] Configurer `SUPABASE_SERVICE_ROLE_KEY`.
@@ -31,7 +31,7 @@ Cette checklist couvre les éléments restant à traiter avant de déclarer Sade
 - [x] La CI installe Chromium avec `npx playwright install --with-deps chromium`.
 - [ ] Installer `libnspr4` localement pour exécuter Playwright.
 - [ ] Exécuter `npm run test:e2e` localement.
-- [ ] Vérifier le job E2E sur GitHub Actions (scénarios ajoutés, dernier workflow en échec à diagnostiquer).
+- [ ] Vérifier le job E2E sur GitHub Actions (scénarios ajoutés, dernier workflow en échec ; logs détaillés à consulter dans GitHub).
 
 ## P1 - Fonctionnalités métier indispensables
 
