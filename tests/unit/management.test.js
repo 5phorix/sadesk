@@ -8,6 +8,11 @@ import {
   closedMonths,
   computeIndicators,
   computeVariance,
+  calculateCost,
+  forecastScenario,
+  evaluateKpiAlert,
+  measureActionEffect,
+  explainVariance,
   matchesBudget,
   monthlyBudgetAmounts,
   monthlyActuals,
@@ -125,6 +130,51 @@ describe('computeVariance', () => {
     const variance = computeVariance(0, 500, 'expense');
     expect(variance.variancePercent).toBeNull();
     expect(variance.consumptionPercent).toBeNull();
+  });
+});
+
+describe('explainVariance', () => {
+  it('retourne les ecarts et les principales ecritures responsables', () => {
+    const result = explainVariance({
+      budgeted: 100,
+      actual: 130,
+      objective: 120,
+      entries: [
+        { label: 'Petit', debit: 10, credit: 0 },
+        { label: 'Grand', debit: 80, credit: 0 },
+      ],
+    });
+
+    expect(result.budget.variance).toBe(30);
+    expect(result.objective.variance).toBe(10);
+    expect(result.drivers[0]).toMatchObject({ label: 'Grand', amount: 80 });
+  });
+});
+
+describe('calculateCost', () => {
+  it('supporte les principales methodes de cout', () => {
+    expect(calculateCost({ method: 'FULL_COST', directCosts: 100, indirectCosts: 40 }).total).toBe(140);
+    expect(calculateCost({ method: 'VARIABLE_COST', variableCosts: 80, fixedCosts: 20 }).total).toBe(80);
+    expect(calculateCost({ method: 'ABC', directCosts: 100, driverValue: 5, driverRate: 8 }).total).toBe(140);
+    expect(calculateCost({ method: 'STANDARD_COST', standardCost: 120, directCosts: 150 }).variance).toBe(30);
+  });
+});
+
+describe('forecastScenario', () => {
+  it('projette revenu, charges, resultat et tresorerie', () => {
+    expect(forecastScenario({ actualRevenue: 100, actualExpenses: 60, remainingRevenue: 50, remainingExpenses: 20, coefficient: 0.8, currentCash: 30, remainingCashFlow: 10 })).toMatchObject({ projectedRevenue: 140, projectedExpenses: 76, projectedResult: 64, projectedCash: 38 });
+  });
+});
+
+describe('alertes et actions', () => {
+  it('évalue un KPI contre ses seuils', () => {
+    expect(evaluateKpiAlert({ name: 'DSO', warning_threshold: 30, alert_threshold: 45 }, 50).level).toBe('critical');
+    expect(evaluateKpiAlert({ name: 'DSO', warning_threshold: 30, alert_threshold: 45 }, 35).level).toBe('warning');
+    expect(evaluateKpiAlert({ name: 'DSO' }, 35)).toBeNull();
+  });
+
+  it('mesure l’efficacité avant après d’une action', () => {
+    expect(measureActionEffect(40, 25, 20)).toEqual({ before: 40, after: 25, improvement: 15, targetGap: 5, improved: true });
   });
 });
 

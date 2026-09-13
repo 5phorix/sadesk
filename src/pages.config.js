@@ -50,9 +50,11 @@
 import Accounts from './pages/Accounts';
 import AnalyticalAccounting from './pages/AnalyticalAccounting';
 import AuditLog from './pages/AuditLog';
+import Analysis from './pages/Analysis';
 import BankReconciliation from './pages/BankReconciliation';
 import BackupRestore from './pages/BackupRestore';
 import BudgetTracking from './pages/BudgetTracking';
+import DecisionAssistant from './pages/DecisionAssistant';
 import CompanySelector from './pages/CompanySelector';
 import CompanyUsers from './pages/CompanyUsers';
 import Controls from './pages/Controls';
@@ -71,6 +73,14 @@ import Lettering from './pages/Lettering';
 import MonthlyClosing from './pages/MonthlyClosing';
 import NotificationSettings from './pages/NotificationSettings';
 import Profitability from './pages/Profitability';
+import Performance from './pages/Performance';
+import KpiManagement from './pages/KpiManagement';
+import Objectives from './pages/Objectives';
+import VarianceAnalysis from './pages/VarianceAnalysis';
+import Costing from './pages/Costing';
+import ForecastScenarios from './pages/ForecastScenarios';
+import PerformanceAlerts from './pages/PerformanceAlerts';
+import ActionPlans from './pages/ActionPlans';
 import Reports from './pages/Reports';
 import Receivables from './pages/Receivables';
 import RolesManagement from './pages/RolesManagement';
@@ -87,9 +97,11 @@ export const PAGES = {
     "Accounts": Accounts,
     "AnalyticalAccounting": AnalyticalAccounting,
     "AuditLog": AuditLog,
+    "Analysis": Analysis,
     "BankReconciliation": BankReconciliation,
     "BackupRestore": BackupRestore,
     "BudgetTracking": BudgetTracking,
+    "DecisionAssistant": DecisionAssistant,
     "CompanySelector": CompanySelector,
     "CompanyUsers": CompanyUsers,
     "Controls": Controls,
@@ -108,6 +120,14 @@ export const PAGES = {
     "MonthlyClosing": MonthlyClosing,
     "NotificationSettings": NotificationSettings,
     "Profitability": Profitability,
+    "Performance": Performance,
+    "KpiManagement": KpiManagement,
+    "Objectives": Objectives,
+    "VarianceAnalysis": VarianceAnalysis,
+    "Costing": Costing,
+    "ForecastScenarios": ForecastScenarios,
+    "PerformanceAlerts": PerformanceAlerts,
+    "ActionPlans": ActionPlans,
     "Reports": Reports,
     "Receivables": Receivables,
     "RolesManagement": RolesManagement,

@@ -4,13 +4,14 @@ import { AlertTriangle, ArrowUpRight, CheckCircle2, Clock3, FileWarning, ShieldC
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useAccountingEntries, useAccounts, useBankTransactions, useInvoices, useStocks } from '@/components/hooks/useCompanyData';
+import { useMonthlyClosings } from '@/components/hooks/useManagement';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import PageHeader from '@/components/common/PageHeader';
 import AmountDisplay from '@/components/common/AmountDisplay';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { detectAccountingAnomalies } from '@/lib/accounting';
+import { detectAccountingAnomalies, groupByVoucher } from '@/lib/accounting';
 import { createPageUrl } from '@/utils';
 
 function ControlMetric({ label, value, detail, icon: Icon, tone, to }) {
@@ -38,6 +39,7 @@ export default function Controls() {
   const { data: bankTransactions = [], isLoading: bankLoading } = useBankTransactions();
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices();
   const { data: stocks = [], isLoading: stocksLoading } = useStocks();
+  const { data: closings = [], isLoading: closingsLoading } = useMonthlyClosings();
 
   const controlData = useMemo(() => {
     const today = new Date();
@@ -59,11 +61,16 @@ export default function Controls() {
       return minimumQuantity > 0 && Number(stock.quantity || 0) <= minimumQuantity;
     });
     const lowStockValue = lowStockItems.reduce((total, stock) => total + (Number(stock.quantity || 0) * Number(stock.unit_price || 0)), 0);
+    const unbalancedVouchers = groupByVoucher(entries).filter((voucher) => !voucher.isBalanced);
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+    const closedMonths = new Set(closings.filter((closing) => Number(closing.year) === currentYear && closing.status === 'closed').map((closing) => Number(closing.month)));
+    const openClosingMonths = Array.from({ length: currentMonth }, (_, index) => index + 1).filter((month) => !closedMonths.has(month));
 
-    return { anomalies, overdueInvoices, overdueAmount, unvalidatedEntries, incompleteInvoices, unreconciledTransactions, unreconciledAmount, lowStockItems, lowStockValue };
-  }, [accounts, bankTransactions, entries, invoices, stocks]);
+    return { anomalies, overdueInvoices, overdueAmount, unvalidatedEntries, incompleteInvoices, unreconciledTransactions, unreconciledAmount, lowStockItems, lowStockValue, unbalancedVouchers, openClosingMonths };
+  }, [accounts, bankTransactions, closings, entries, invoices, stocks]);
 
-  const isLoading = entriesLoading || accountsLoading || bankLoading || invoicesLoading || stocksLoading;
+  const isLoading = entriesLoading || accountsLoading || bankLoading || invoicesLoading || stocksLoading || closingsLoading;
   const severityLabel = { high: 'Élevée', medium: 'Moyenne', low: 'Faible' };
   const severityStyle = { high: 'border-red-200 bg-red-50 text-red-800', medium: 'border-amber-200 bg-amber-50 text-amber-800', low: 'border-slate-200 bg-slate-50 text-slate-700' };
 
@@ -82,6 +89,7 @@ export default function Controls() {
           <ControlMetric label="Pièces incomplètes" value={controlData.incompleteInvoices.length} detail="Factures sans tiers, date ou montant TTC" icon={FileWarning} tone="text-slate-700" to={createPageUrl('Invoices')} />
           <ControlMetric label="Transactions non rapprochées" value={controlData.unreconciledTransactions.length} detail={<AmountDisplay amount={controlData.unreconciledAmount} size="sm" showSign />} icon={Clock3} tone="text-orange-600" to={createPageUrl('BankReconciliation')} />
           <ControlMetric label="Stocks sous seuil" value={controlData.lowStockItems.length} detail={<AmountDisplay amount={controlData.lowStockValue} size="sm" />} icon={FileWarning} tone="text-red-600" to={createPageUrl('StockManagement')} />
+          <ControlMetric label="Contrôles de clôture" value={controlData.unbalancedVouchers.length + controlData.openClosingMonths.length} detail={`${controlData.unbalancedVouchers.length} pièce(s) déséquilibrée(s) · ${controlData.openClosingMonths.length} période(s) ouverte(s)`} icon={ShieldCheck} tone="text-amber-600" to={createPageUrl('MonthlyClosing')} />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.8fr)]">

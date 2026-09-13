@@ -70,6 +70,8 @@ Le projet est en JavaScript/JSX : `npm run typecheck` vérifie la résolution de
 
 Voir [SECURITY.md](SECURITY.md) pour l'isolement de `xlsx`, l'audit npm et la vérification des secrets GitHub.
 
+Voir [ARCHITECTURE.md](ARCHITECTURE.md) pour les niveaux produit, les responsabilités des modules et les règles de cloisonnement.
+
 **Tests d'intégration**
 
 Ils vérifient le cloisonnement des données entre sociétés et les permissions des rôles

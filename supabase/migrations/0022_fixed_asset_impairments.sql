@@ -1,5 +1,5 @@
 -- Registre des tests de valeur et dépréciations des immobilisations.
-create table public.fixed_asset_impairments (
+create table if not exists public.fixed_asset_impairments (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.companies(id) on delete cascade,
   asset_id uuid not null references public.fixed_assets(id) on delete cascade,
@@ -16,6 +16,8 @@ create table public.fixed_asset_impairments (
 );
 
 alter table public.fixed_asset_impairments enable row level security;
+drop policy if exists fixed_asset_impairments_member on public.fixed_asset_impairments;
+drop policy if exists fixed_asset_impairments_editor on public.fixed_asset_impairments;
 create policy fixed_asset_impairments_member on public.fixed_asset_impairments for select using (public.is_company_member(company_id));
 create policy fixed_asset_impairments_editor on public.fixed_asset_impairments for all using (public.is_company_editor(company_id)) with check (public.is_company_editor(company_id));
-create index fixed_asset_impairments_company_date_idx on public.fixed_asset_impairments(company_id, assessment_date);
+create index if not exists fixed_asset_impairments_company_date_idx on public.fixed_asset_impairments(company_id, assessment_date);

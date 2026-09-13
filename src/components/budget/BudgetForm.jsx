@@ -124,6 +124,27 @@ export default function BudgetForm({ open, budget, onClose, onSave }) {
 
       await saveLines.mutateAsync({ budgetId, amounts: monthlyAmounts });
 
+      const { data: versions, error: versionsError } = await supabase
+        .from('performance_budget_versions')
+        .select('version')
+        .eq('budget_id', budgetId)
+        .order('version', { ascending: false })
+        .limit(1);
+      if (versionsError) throw versionsError;
+      const nextVersion = (versions?.[0]?.version || 0) + 1;
+      const { error: versionError } = await supabase.from('performance_budget_versions').insert({
+        company_id: user.active_company_id,
+        budget_id: budgetId,
+        version: nextVersion,
+        total_amount: totalAmount,
+        monthly_amounts: Object.fromEntries(monthlyAmounts.map((amount, index) => [index + 1, Number(amount) || 0])),
+        reason: budget ? 'Révision du budget' : 'Version initiale',
+        status: 'draft',
+        valid_from: `${formData.fiscal_year}-01-01`,
+        created_by: user.id,
+      });
+      if (versionError) throw versionError;
+
       toast.success(budget ? 'Budget mis à jour' : 'Budget créé');
       onSave();
     } catch (error) {

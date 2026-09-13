@@ -26,4 +26,14 @@ La presence des secrets ne peut pas etre lue depuis le code source. Le workflow 
 
 Verification par un mainteneur dans GitHub : `Settings > Secrets and variables > Actions`. Les valeurs ne doivent jamais etre affichees dans les logs.
 
+## Rotation des secrets
+
+1. Creer un nouveau secret chez le fournisseur concerne, sans supprimer l'ancien.
+2. Mettre a jour le secret correspondant dans `Settings > Secrets and variables > Actions` et dans les variables du fournisseur de deploiement.
+3. Lancer la CI et un test fonctionnel non destructif : notifications, relances ou IA selon le secret change.
+4. Revoquer l'ancien secret chez le fournisseur.
+5. Verifier les journaux sans afficher de valeur sensible et consigner la date de rotation.
+
+Secrets concernes : `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_PUBLIC_URL`, `AI_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM` et `CRON_SECRET`.
+
 Le job E2E ne depend pas de secrets Supabase : il installe Chromium avec ses dependances Linux et execute le smoke test navigateur.

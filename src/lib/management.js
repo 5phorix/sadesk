@@ -124,6 +124,58 @@ export function computeVariance(budgeted, actual, category = 'expense') {
   };
 }
 
+/** Compare une valeur réalisée à un budget et un objectif. */
+export function explainVariance({ budgeted = 0, actual = 0, objective = null, category = 'expense', entries = [] }) {
+  const budget = computeVariance(budgeted, actual, category);
+  const target = objective === null ? null : computeVariance(objective, actual, category);
+  const drivers = entries
+    .map((entry) => ({ ...entry, amount: realizedAmount(entry, category) }))
+    .filter((entry) => entry.amount !== 0)
+    .sort((left, right) => Math.abs(right.amount) - Math.abs(left.amount))
+    .slice(0, 10);
+
+  return { budget, objective: target, drivers };
+}
+
+export const COSTING_METHODS = ['FULL_COST', 'VARIABLE_COST', 'DIRECT_COST', 'STANDARD_COST', 'ABC', 'MARGINAL_COST'];
+
+/** Calcule le coût d'un objet selon une méthode explicite et traçable. */
+export function calculateCost({ method, directCosts = 0, indirectCosts = 0, variableCosts = 0, fixedCosts = 0, standardCost = null, driverValue = 0, driverRate = 0, marginalUnitCost = 0, quantity = 1 }) {
+  const direct = round2(directCosts);
+  const indirect = round2(indirectCosts);
+  const variable = round2(variableCosts);
+  const fixed = round2(fixedCosts);
+  const allocated = round2(Number(driverValue) * Number(driverRate));
+  const total = method === 'FULL_COST' ? direct + indirect : method === 'VARIABLE_COST' ? variable : method === 'DIRECT_COST' ? direct : method === 'STANDARD_COST' ? (direct + indirect || round2(standardCost || 0)) : method === 'ABC' ? direct + allocated : round2(Number(marginalUnitCost) * Number(quantity));
+  return { method, directCosts: direct, indirectCosts: indirect, variableCosts: variable, fixedCosts: fixed, allocatedIndirectCosts: allocated, total: round2(total), unitCost: quantity ? round2(total / Number(quantity)) : 0, variance: standardCost === null ? null : round2(total - Number(standardCost)) };
+}
+
+/** Projette un atterrissage selon un scénario de chiffre d'affaires et de charges. */
+export function forecastScenario({ actualRevenue = 0, actualExpenses = 0, remainingRevenue = 0, remainingExpenses = 0, coefficient = 1, currentCash = 0, remainingCashFlow = 0 }) {
+  const projectedRevenue = round2(Number(actualRevenue) + Number(remainingRevenue) * Number(coefficient));
+  const projectedExpenses = round2(Number(actualExpenses) + Number(remainingExpenses) * Number(coefficient));
+  const projectedResult = round2(projectedRevenue - projectedExpenses);
+  return { projectedRevenue, projectedExpenses, projectedResult, projectedMarginRate: projectedRevenue ? round2((projectedResult / projectedRevenue) * 100) : null, projectedCash: round2(Number(currentCash) + Number(remainingCashFlow) * Number(coefficient)) };
+}
+
+/** Détermine le niveau d'alerte d'un KPI et explique le déclenchement. */
+export function evaluateKpiAlert(kpi, value) {
+  const numericValue = round2(value);
+  const alertThreshold = kpi.alert_threshold === null || kpi.alert_threshold === undefined ? null : Number(kpi.alert_threshold);
+  const warningThreshold = kpi.warning_threshold === null || kpi.warning_threshold === undefined ? null : Number(kpi.warning_threshold);
+  if (alertThreshold !== null && numericValue >= alertThreshold) return { level: 'critical', threshold: alertThreshold, message: `${kpi.name} atteint ${numericValue}, au-dessus du seuil critique de ${alertThreshold}.` };
+  if (warningThreshold !== null && numericValue >= warningThreshold) return { level: 'warning', threshold: warningThreshold, message: `${kpi.name} atteint ${numericValue}, au-dessus du seuil de vigilance de ${warningThreshold}.` };
+  return null;
+}
+
+export function measureActionEffect(beforeValue, afterValue, targetValue = null) {
+  const before = round2(beforeValue);
+  const after = round2(afterValue);
+  const improvement = round2(before - after);
+  const targetGap = targetValue === null ? null : round2(after - Number(targetValue));
+  return { before, after, improvement, targetGap, improved: improvement > 0 };
+}
+
 /**
  * Statut d'un budget au regard des seuils configurés.
  * Retourne 'ok', 'warning' ou 'alert'.

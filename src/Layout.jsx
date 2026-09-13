@@ -60,7 +60,7 @@ const navSections = [
     ]
   },
   {
-    title: 'Gestion Comptable',
+    Lightbulb,
     items: [
       { name: 'Contrôles', icon: Shield, page: 'Controls' },
       { name: 'Factures', icon: FileText, page: 'Invoices' },
@@ -82,6 +82,21 @@ const navSections = [
       { name: 'Rentabilité', icon: PieChart, page: 'Profitability' },
       { name: 'Analytique', icon: Target, page: 'AnalyticalAccounting' },
       { name: 'Clôtures mensuelles', icon: CalendarCheck, page: 'MonthlyClosing' },
+    ]
+  },
+  {
+    title: 'Analyse et décision',
+    items: [
+      { name: 'Performance', icon: Gauge, page: 'Performance' },
+      { name: 'Analyser', icon: BarChart3, page: 'Analysis' },
+      { name: 'KPI personnalisés', icon: Gauge, page: 'KpiManagement' },
+      { name: 'Objectifs', icon: Target, page: 'Objectives' },
+      { name: 'Analyse des écarts', icon: BarChart3, page: 'VarianceAnalysis' },
+      { name: 'Calcul des coûts', icon: Calculator, page: 'Costing' },
+      { name: 'Prévisions & scénarios', icon: TrendingUp, page: 'ForecastScenarios' },
+      { name: 'Alertes performance', icon: Bell, page: 'PerformanceAlerts' },
+      { name: 'Plans d’action', icon: CheckCircle2, page: 'ActionPlans' },
+      { name: 'Aider à décider', icon: Lightbulb, page: 'DecisionAssistant' },
     ]
   },
   {
