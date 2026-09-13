@@ -50,6 +50,7 @@ import PageHeader from '@/components/common/PageHeader';
 import { toast } from 'sonner';
 import { toastSupabaseError } from '@/lib/supabase-errors';
 import { cn } from '@/lib/utils';
+import { accountingPlanCurrencyError } from '@/lib/data-transfer';
 import {
   DEFAULT_DASHBOARD_PREFERENCES,
   loadDashboardPreferences,
@@ -170,6 +171,11 @@ export default function Settings() {
   const handleSaveCompany = async () => {
     setSaving(true);
     try {
+      const planCurrencyError = accountingPlanCurrencyError(companyData.accounting_plan, companyData.currency);
+      if (planCurrencyError) {
+        toast.error(planCurrencyError);
+        return;
+      }
       const payload = {
         ...companyData,
         // Les colonnes contraintes n'acceptent pas la chaine vide.

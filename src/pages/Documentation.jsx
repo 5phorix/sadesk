@@ -529,8 +529,9 @@ Sélection de période pour cibler les analyses.
 ### Import
 **Formats acceptés :**
 - CSV
-- Excel (XLSX)
+- JSON
 - PDF (extraction par IA)
+- Images JPG, PNG, WEBP ou GIF (extraction par IA)
 
 **Entités importables :**
 - Factures
@@ -550,6 +551,9 @@ Export au format CSV pour :
 - Tiers
 - Écritures
 - Plan comptable
+
+### Export JSON
+Export JSON des mêmes données pour les intégrations et traitements automatisés.
 
 ### FEC (Fichier des Écritures Comptables)
 **Format officiel français** pour l'administration fiscale.

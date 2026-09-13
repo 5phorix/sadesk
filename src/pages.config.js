@@ -51,9 +51,11 @@ import Accounts from './pages/Accounts';
 import AnalyticalAccounting from './pages/AnalyticalAccounting';
 import AuditLog from './pages/AuditLog';
 import BankReconciliation from './pages/BankReconciliation';
+import BackupRestore from './pages/BackupRestore';
 import BudgetTracking from './pages/BudgetTracking';
 import CompanySelector from './pages/CompanySelector';
 import CompanyUsers from './pages/CompanyUsers';
+import Controls from './pages/Controls';
 import Dashboard from './pages/ManagementDashboard';
 import Documentation from './pages/Documentation';
 import Documents from './pages/Documents';
@@ -86,9 +88,11 @@ export const PAGES = {
     "AnalyticalAccounting": AnalyticalAccounting,
     "AuditLog": AuditLog,
     "BankReconciliation": BankReconciliation,
+    "BackupRestore": BackupRestore,
     "BudgetTracking": BudgetTracking,
     "CompanySelector": CompanySelector,
     "CompanyUsers": CompanyUsers,
+    "Controls": Controls,
     "Dashboard": Dashboard,
     "Documentation": Documentation,
     "Documents": Documents,

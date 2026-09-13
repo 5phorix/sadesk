@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/api/supabaseClient';
 import { useUser } from '@/components/hooks/useUser';
 import {
   useCloseMonth,
@@ -48,6 +50,7 @@ import {
 } from 'recharts';
 import { CalendarCheck, Lock, LockOpen, Wallet, Scale, PiggyBank, Percent } from 'lucide-react';
 import { toast } from 'sonner';
+import { buildOpeningEntries } from '@/lib/auxiliaryAccounting';
 
 const euro = (value) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value || 0);
@@ -85,11 +88,13 @@ export default function MonthlyClosing() {
   const [monthToClose, setMonthToClose] = useState(null);
   const [closingToReopen, setClosingToReopen] = useState(null);
   const [notes, setNotes] = useState('');
+  const [openingLoading, setOpeningLoading] = useState(false);
 
   const { data: entries = [], isLoading } = useYearEntries(year);
   const { data: closings = [] } = useMonthlyClosings();
   const closeMonth = useCloseMonth();
   const reopenMonth = useReopenMonth();
+  const queryClient = useQueryClient();
 
   const canAdminister = ADMIN_ROLES.includes(user?.role);
 
@@ -165,6 +170,33 @@ export default function MonthlyClosing() {
     }
   };
 
+  const handleGenerateOpening = async () => {
+    const targetDate = `${year + 1}-01-01`;
+    const entryNumber = `AN-${year + 1}`;
+    setOpeningLoading(true);
+    try {
+      const { data: existing, error: existingError } = await supabase
+        .from('accounting_entries')
+        .select('id')
+        .eq('company_id', user.active_company_id)
+        .eq('entry_number', entryNumber)
+        .limit(1);
+      if (existingError) throw existingError;
+      if (existing?.length) throw new Error(`Les à-nouveaux ${year + 1} existent déjà.`);
+
+      const openingEntries = buildOpeningEntries(entries, targetDate, user.active_company_id);
+      if (!openingEntries.length) throw new Error('Aucun solde de bilan à reprendre.');
+      const { error } = await supabase.from('accounting_entries').insert(openingEntries);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['entries-year', user.active_company_id] });
+      toast.success(`${openingEntries.length} ligne(s) d’à-nouveaux générée(s) en brouillon`);
+    } catch (error) {
+      toastSupabaseError(error, 'Les à-nouveaux n’ont pas pu être générés.');
+    } finally {
+      setOpeningLoading(false);
+    }
+  };
+
   return (
     <ProtectedRoute>
       <div>
@@ -193,6 +225,11 @@ export default function MonthlyClosing() {
                 >
                   <CalendarCheck className="mr-2 h-4 w-4" />
                   Clôturer {MONTH_LABELS[suggestedMonth - 1]}
+                </Button>
+              )}
+              {canAdminister && (
+                <Button variant="outline" onClick={handleGenerateOpening} disabled={openingLoading}>
+                  {openingLoading ? 'Génération...' : `À-nouveaux ${year + 1}`}
                 </Button>
               )}
             </>

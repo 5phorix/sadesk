@@ -28,12 +28,15 @@ import { Plus, Trash2, AlertTriangle, Package } from 'lucide-react';
 import AmountDisplay from '@/components/common/AmountDisplay';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { buildStockImpairmentEntries, buildStockMovementEntries, stockValuation } from '@/lib/auxiliaryAccounting';
 
 export default function StockManagement() {
   const { user } = useUser();
   const [showForm, setShowForm] = useState(false);
   const [editingStock, setEditingStock] = useState(null);
   const [deleteStock, setDeleteStock] = useState(null);
+  const [movementStock, setMovementStock] = useState(null);
+  const [impairmentStock, setImpairmentStock] = useState(null);
   const [search, setSearch] = useState('');
 
   const queryClient = useQueryClient();
@@ -42,6 +45,67 @@ export default function StockManagement() {
     queryKey: ['stocks', user?.active_company_id],
     queryFn: async () => { const { data, error } = await supabase.from('stock_items').select('*').eq('company_id', user.active_company_id).order('product_name'); if (error) throw error; return data; },
     enabled: !!user?.active_company_id,
+  });
+
+  const { data: impairments = [] } = useQuery({
+    queryKey: ['stock-impairments', user?.active_company_id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('stock_impairments').select('*').eq('company_id', user.active_company_id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.active_company_id,
+  });
+
+  const movementMutation = useMutation({
+    mutationFn: async ({ stock, movement }) => {
+      const { data: created, error: movementError } = await supabase.from('stock_movements').insert({
+        company_id: user.active_company_id,
+        stock_item_id: stock.id,
+        ...movement,
+      }).select().single();
+      if (movementError) throw movementError;
+      const entries = buildStockMovementEntries({ ...created, product_name: stock.product_name }, user.active_company_id);
+      if (entries.length) {
+        const { error: entryError } = await supabase.from('accounting_entries').insert(entries);
+        if (entryError) throw entryError;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stocks', user.active_company_id] });
+      queryClient.invalidateQueries({ queryKey: ['entries', user.active_company_id] });
+      setMovementStock(null);
+      toast.success('Mouvement enregistré et variation comptable créée');
+    },
+    onError: (error) => toast.error(error.message || 'Impossible d’enregistrer le mouvement'),
+  });
+
+  const impairmentMutation = useMutation({
+    mutationFn: async ({ stock, assessment }) => {
+      const values = stockValuation(stock, Number(assessment.recoverable_value || 0));
+      if (values.impairment <= 0) throw new Error('Aucune dépréciation à enregistrer');
+      const entry = buildStockImpairmentEntries(stock, { impairment: values.impairment, assessment_date: assessment.date }, user.active_company_id);
+      const { data: created, error: insertError } = await supabase.from('stock_impairments').insert({
+        company_id: user.active_company_id,
+        stock_item_id: stock.id,
+        assessment_date: assessment.date,
+        book_value: values.bookValue,
+        recoverable_value: values.recoverableValue,
+        notes: assessment.notes || null,
+      }).select().single();
+      if (insertError) throw insertError;
+      const { error: entryError } = await supabase.from('accounting_entries').insert(entry);
+      if (entryError) throw entryError;
+      const { error: updateError } = await supabase.from('stock_impairments').update({ is_posted: true, accounting_entry_number: entry[0].entry_number }).eq('id', created.id).eq('company_id', user.active_company_id);
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stock-impairments', user.active_company_id] });
+      queryClient.invalidateQueries({ queryKey: ['entries', user.active_company_id] });
+      setImpairmentStock(null);
+      toast.success('Dépréciation de stock enregistrée en brouillon');
+    },
+    onError: (error) => toast.error(error.message || 'Impossible d’enregistrer la dépréciation'),
   });
 
   const createMutation = useMutation({
@@ -75,7 +139,7 @@ export default function StockManagement() {
 
   const stockStats = useMemo(() => {
     const totalValue = stocks.reduce((sum, s) => sum + ((s.quantity || 0) * (s.unit_price || 0)), 0);
-    const lowStock = stocks.filter(s => s.quantity <= (s.min_quantity || 0)).length;
+    const lowStock = stocks.filter(s => (s.min_quantity || 0) > 0 && s.quantity <= s.min_quantity).length;
     const totalProducts = stocks.length;
     const totalQuantity = stocks.reduce((sum, s) => sum + (s.quantity || 0), 0);
 
@@ -171,8 +235,9 @@ export default function StockManagement() {
       {/* Liste des stocks */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredStocks.map(stock => {
-          const isLowStock = stock.quantity <= (stock.min_quantity || 0);
+          const isLowStock = (stock.min_quantity || 0) > 0 && stock.quantity <= stock.min_quantity;
           const totalValue = (stock.quantity || 0) * (stock.unit_price || 0);
+          const stockImpairments = impairments.filter((impairment) => impairment.stock_item_id === stock.id);
 
           return (
             <Card key={stock.id} className={isLowStock ? 'border-red-300' : ''}>
@@ -193,6 +258,24 @@ export default function StockManagement() {
                       onClick={() => { setEditingStock(stock); setShowForm(true); }}
                     >
                       ✏️
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      aria-label={`Mouvement ${stock.product_name}`}
+                      onClick={() => setMovementStock(stock)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      aria-label={`Déprécier ${stock.product_name}`}
+                      onClick={() => setImpairmentStock(stock)}
+                    >
+                      <AlertTriangle className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -239,6 +322,9 @@ export default function StockManagement() {
                   {stock.location && (
                     <p className="text-xs text-slate-500">📍 {stock.location}</p>
                   )}
+                  {stockImpairments.length > 0 && (
+                    <p className="text-xs text-amber-700">{stockImpairments.length} évaluation(s) de dépréciation</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -252,6 +338,22 @@ export default function StockManagement() {
         onOpenChange={setShowForm}
         stock={editingStock}
         onSubmit={handleSubmit}
+      />
+
+      <MovementForm
+        open={!!movementStock}
+        onOpenChange={(open) => !open && setMovementStock(null)}
+        stock={movementStock}
+        pending={movementMutation.isPending}
+        onSubmit={(movement) => movementMutation.mutate({ stock: movementStock, movement })}
+      />
+
+      <StockImpairmentForm
+        open={!!impairmentStock}
+        onOpenChange={(open) => !open && setImpairmentStock(null)}
+        stock={impairmentStock}
+        pending={impairmentMutation.isPending}
+        onSubmit={(assessment) => impairmentMutation.mutate({ stock: impairmentStock, assessment })}
       />
 
       {/* Dialog suppression */}
@@ -276,6 +378,47 @@ export default function StockManagement() {
       </AlertDialog>
     </div>
   );
+}
+
+function MovementForm({ open, onOpenChange, stock, pending, onSubmit }) {
+  const [formData, setFormData] = useState({
+    movement_date: new Date().toISOString().slice(0, 10),
+    movement_type: 'receipt',
+    quantity: 1,
+    unit_cost: 0,
+    reference: '',
+  });
+
+  React.useEffect(() => {
+    if (open) setFormData({ movement_date: new Date().toISOString().slice(0, 10), movement_type: 'receipt', quantity: 1, unit_cost: Number(stock?.unit_price || 0), reference: '' });
+  }, [open, stock]);
+
+  const update = (field) => (event) => setFormData((current) => ({ ...current, [field]: event.target.type === 'number' ? Number(event.target.value) : event.target.value }));
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (formData.quantity === 0 || formData.unit_cost < 0) return;
+    onSubmit(formData);
+  };
+
+  return <Sheet open={open} onOpenChange={onOpenChange}><SheetContent><SheetHeader><SheetTitle>Mouvement : {stock?.product_name}</SheetTitle><SheetDescription>Les quantités et la variation comptable seront mises à jour.</SheetDescription></SheetHeader><form onSubmit={handleSubmit} className="mt-6 space-y-5"><div className="space-y-2"><Label htmlFor="movement-type">Type de mouvement</Label><select id="movement-type" value={formData.movement_type} onChange={update('movement_type')} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"><option value="receipt">Entrée</option><option value="issue">Sortie</option><option value="adjustment">Ajustement</option></select></div><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="movement-date">Date *</Label><Input id="movement-date" type="date" value={formData.movement_date} onChange={update('movement_date')} required /></div><div className="space-y-2"><Label htmlFor="movement-quantity">Quantité *</Label><Input id="movement-quantity" type="number" step="0.001" value={formData.quantity} onChange={update('quantity')} required /></div></div><div className="space-y-2"><Label htmlFor="movement-cost">Coût unitaire *</Label><Input id="movement-cost" type="number" min="0" step="0.01" value={formData.unit_cost} onChange={update('unit_cost')} required /></div><div className="space-y-2"><Label htmlFor="movement-reference">Référence</Label><Input id="movement-reference" value={formData.reference} onChange={update('reference')} placeholder="Bon de livraison, inventaire..." /></div><div className="flex gap-3"><Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">Annuler</Button><Button type="submit" disabled={pending} className="flex-1">{pending ? 'Enregistrement...' : 'Enregistrer'}</Button></div></form></SheetContent></Sheet>;
+}
+
+function StockImpairmentForm({ open, onOpenChange, stock, pending, onSubmit }) {
+  const [formData, setFormData] = useState({ date: '', recoverable_value: 0, notes: '' });
+
+  React.useEffect(() => {
+    if (open) setFormData({ date: new Date().toISOString().slice(0, 10), recoverable_value: Number(stock?.quantity || 0) * Number(stock?.unit_price || 0), notes: '' });
+  }, [open, stock]);
+
+  const valuation = stock ? stockValuation(stock, formData.recoverable_value) : { bookValue: 0, impairment: 0 };
+  const update = (field) => (event) => setFormData((current) => ({ ...current, [field]: event.target.type === 'number' ? Number(event.target.value) : event.target.value }));
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!formData.date || valuation.impairment <= 0) return;
+    onSubmit(formData);
+  };
+
+  return <Sheet open={open} onOpenChange={onOpenChange}><SheetContent><SheetHeader><SheetTitle>Déprécier {stock?.product_name}</SheetTitle><SheetDescription>Comparez la valeur comptable à la valeur recouvrable estimée.</SheetDescription></SheetHeader><form onSubmit={handleSubmit} className="mt-6 space-y-5"><div className="space-y-2"><Label>Valeur comptable</Label><Input value={valuation.bookValue.toFixed(2)} readOnly /></div><div className="space-y-2"><Label htmlFor="stock-impairment-date">Date d’évaluation *</Label><Input id="stock-impairment-date" type="date" value={formData.date} onChange={update('date')} required /></div><div className="space-y-2"><Label htmlFor="stock-recoverable-value">Valeur recouvrable *</Label><Input id="stock-recoverable-value" type="number" min="0" step="0.01" value={formData.recoverable_value} onChange={update('recoverable_value')} required /></div><div className="space-y-2"><Label htmlFor="stock-impairment-notes">Notes</Label><Input id="stock-impairment-notes" value={formData.notes} onChange={update('notes')} /></div><div className="rounded-lg bg-amber-50 p-4"><p className="text-sm text-amber-800">Provision calculée</p><p className="text-xl font-semibold text-amber-900">{valuation.impairment.toFixed(2)} €</p></div><div className="flex gap-3"><Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">Annuler</Button><Button type="submit" disabled={pending || valuation.impairment <= 0} className="flex-1">Enregistrer</Button></div></form></SheetContent></Sheet>;
 }
 
 function StockForm({ open, onOpenChange, stock, onSubmit }) {
@@ -376,7 +519,7 @@ function StockForm({ open, onOpenChange, stock, onSubmit }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Stock minimum</Label>
+              <Label>Stock minimum (0 = aucune alerte)</Label>
               <Input
                 type="number"
                 value={formData.min_quantity}

@@ -68,6 +68,8 @@ Les tests locaux lisent ces noms depuis `.env.test.local`, qui ne doit jamais ê
 
 Le projet est en JavaScript/JSX : `npm run typecheck` vérifie la résolution des modules et la compilation JSX. ESLint porte les diagnostics JavaScript (`npm run lint`).
 
+Voir [SECURITY.md](SECURITY.md) pour l'isolement de `xlsx`, l'audit npm et la vérification des secrets GitHub.
+
 **Tests d'intégration**
 
 Ils vérifient le cloisonnement des données entre sociétés et les permissions des rôles

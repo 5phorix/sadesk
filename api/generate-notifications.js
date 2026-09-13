@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { detectAccountingAnomalies } from '../src/lib/accounting.js';
+import { receivableReminder } from '../src/lib/auxiliaryAccounting.js';
 
 const daysBetween = (left, right) => Math.ceil((left - right) / (1000 * 60 * 60 * 24));
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -35,6 +36,32 @@ async function sendEmail({ recipient, notifications }) {
   if (!response.ok) {
     const details = await response.text();
     console.error('Email provider error:', response.status, details);
+    return { sent: false, reason: 'provider_error' };
+  }
+  return { sent: true, reason: null };
+}
+
+async function sendReceivableFollowup({ recipient, invoice, level, daysLate }) {
+  if (!process.env.RESEND_API_KEY) return { sent: false, reason: 'provider_not_configured' };
+  if (!EMAIL_PATTERN.test(recipient || '')) return { sent: false, reason: 'recipient_invalid' };
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: process.env.EMAIL_FROM || 'SADESK Compta <onboarding@resend.dev>',
+      to: [recipient],
+      subject: `Relance ${level} - facture ${invoice.invoice_number || 'client'}`,
+      html: `<p>Bonjour,</p><p>La facture <strong>${escapeHtml(invoice.invoice_number || 'sans numéro')}</strong> d'un montant de <strong>${escapeHtml(invoice.amount_ttc)} EUR</strong> présente ${daysLate} jour(s) de retard.</p><p>Merci de procéder à son règlement ou de nous indiquer sa date de paiement prévue.</p><p>Cordialement,<br>SADESK Compta</p>`
+    })
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    console.error('Receivable followup email error:', response.status, details);
     return { sent: false, reason: 'provider_error' };
   }
   return { sent: true, reason: null };
@@ -83,20 +110,23 @@ export default async function handler(request, response) {
       { data: parties, error: partiesError },
       { data: entries, error: entriesError },
       { data: accounts, error: accountsError },
-      { data: recipients, error: recipientsError }
+      { data: recipients, error: recipientsError },
+      { data: followups, error: followupsError }
     ] = await Promise.all([
       adminClient.from('notification_settings').select('*').eq('company_id', companyId).maybeSingle(),
       adminClient.from('invoices').select('*').eq('company_id', companyId).in('status', ['brouillon', 'validee']),
       adminClient.from('third_parties').select('*').eq('company_id', companyId).eq('is_active', true),
       adminClient.from('accounting_entries').select('*').eq('company_id', companyId),
       adminClient.from('accounts').select('code').eq('company_id', companyId),
-      adminClient.from('company_users').select('user_id').eq('company_id', companyId).eq('status', 'active').not('user_id', 'is', null)
+      adminClient.from('company_users').select('user_id').eq('company_id', companyId).eq('status', 'active').not('user_id', 'is', null),
+      adminClient.from('receivable_followups').select('invoice_id, level, status').eq('company_id', companyId)
     ]);
     if (invoicesError) throw invoicesError;
     if (partiesError) throw partiesError;
     if (entriesError) throw entriesError;
     if (accountsError) throw accountsError;
     if (recipientsError) throw recipientsError;
+    if (followupsError) throw followupsError;
 
     const settings = setting || {
       invoice_reminder_days: 7,
@@ -110,6 +140,38 @@ export default async function handler(request, response) {
     };
     const today = new Date();
     const notifications = [];
+    const followupRows = [];
+    const followupByKey = new Map((followups || []).map((followup) => [`${followup.invoice_id}:${followup.level}`, followup]));
+
+    if (settings.send_email_notifications && settings.enabled_types?.invoice_overdue !== false) {
+      for (const invoice of invoices || []) {
+        const reminder = receivableReminder(invoice, today);
+        if (!reminder) continue;
+        const { daysLate, level } = reminder;
+
+        const key = `${invoice.id}:${level}`;
+        if (followupByKey.has(key)) continue;
+
+        const party = (parties || []).find((candidate) => candidate.id === invoice.third_party_id);
+        const recipient = party?.email || invoice.third_party_email;
+        const email = await sendReceivableFollowup({ recipient, invoice, level, daysLate });
+        followupRows.push({
+          company_id: companyId,
+          invoice_id: invoice.id,
+          level,
+          scheduled_date: today.toISOString().slice(0, 10),
+          sent_at: email.sent ? new Date().toISOString() : null,
+          status: email.sent ? 'sent' : 'planned',
+          channel: 'email',
+          notes: email.sent ? null : `Relance non envoyée: ${email.reason}`
+        });
+      }
+    }
+
+    if (followupRows.length) {
+      const { error: followupInsertError } = await adminClient.from('receivable_followups').insert(followupRows);
+      if (followupInsertError) throw followupInsertError;
+    }
 
     for (const invoice of invoices || []) {
       if (!invoice.due_date) continue;
@@ -228,6 +290,8 @@ export default async function handler(request, response) {
     return response.status(200).json({
       success: true,
       notifications_created: newNotificationRows.length,
+      followups_created: followupRows.length,
+      followups_sent: followupRows.filter((followup) => followup.status === 'sent').length,
       email,
       message: `${notifications.length} notification(s) créée(s)`
     });

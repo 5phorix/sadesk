@@ -217,7 +217,7 @@ RÈGLES TECHNIQUES
           <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-slate-300 transition-colors">
             <input
               type="file"
-              accept=".csv,.xlsx,.xls"
+              accept=".pdf,image/jpeg,image/png,image/webp,image/gif"
               onChange={handleFileChange}
               className="hidden"
               id="statement-upload"
@@ -228,7 +228,7 @@ RÈGLES TECHNIQUES
                 Cliquez pour importer un relevé bancaire
               </p>
               <p className="text-xs text-slate-400">
-                Formats acceptés : CSV, Excel
+                Formats acceptés : PDF et images JPG, PNG, WEBP ou GIF
               </p>
             </label>
           </div>

@@ -26,6 +26,7 @@ export function useCompanyData(entityName, options = {}) {
         ThirdParty: 'third_parties',
         AccountingEntry: 'accounting_entries',
         Account: 'accounts',
+        BankTransaction: 'bank_transactions',
         Document: 'documents',
         Stock: 'stock_items',
         CostCenter: 'cost_centers'
@@ -62,6 +63,10 @@ export function useAccountingEntries(options = {}) {
 
 export function useAccounts(options = {}) {
   return useCompanyData('Account', { sortBy: 'code', ...options });
+}
+
+export function useBankTransactions(options = {}) {
+  return useCompanyData('BankTransaction', { sortBy: '-transaction_date', ...options });
 }
 
 export function useDocuments(options = {}) {

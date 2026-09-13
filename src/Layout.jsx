@@ -62,6 +62,7 @@ const navSections = [
   {
     title: 'Gestion Comptable',
     items: [
+      { name: 'Contrôles', icon: Shield, page: 'Controls' },
       { name: 'Factures', icon: FileText, page: 'Invoices' },
       { name: 'Scanner facture', icon: Camera, page: 'ScanInvoice' },
       { name: 'Écritures', icon: Receipt, page: 'Entries' },
@@ -119,6 +120,7 @@ const navSections = [
     title: 'Import/Export',
     items: [
       { name: 'Import/Export', icon: Upload, page: 'ImportExport' },
+      { name: 'Sauvegarde / restauration', icon: History, page: 'BackupRestore' },
     ]
   },
   {

@@ -27,6 +27,7 @@ import {
 import { toast } from 'sonner';
 import { toastSupabaseError } from '@/lib/supabase-errors';
 import { useUser } from '@/components/hooks/useUser';
+import { applyVatRegime, vatAccounts } from '@/lib/auxiliaryAccounting';
 
 export default function Invoices() {
   const { user } = useUser();
@@ -91,6 +92,16 @@ export default function Invoices() {
     staleTime: 30000,
   });
 
+  const { data: company } = useQuery({
+    queryKey: ['company', user?.active_company_id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('companies').select('accounting_plan, vat_regime').eq('id', user.active_company_id).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.active_company_id,
+  });
+
   const handleGenerateEntry = async (invoice) => {
     setGeneratingId(invoice.id);
     try {
@@ -122,6 +133,17 @@ export default function Invoices() {
       else if (amountHt > 0 && amountTva > 0 && amountTtc === 0) {
         amountTtc = amountHt + amountTva;
       }
+
+      const tax = applyVatRegime({
+        amountHt,
+        amountTva,
+        amountTtc,
+        tvaRate,
+        vatRegime: company?.vat_regime || '',
+      });
+      amountHt = tax.amountHt;
+      amountTva = tax.amountTva;
+      amountTtc = tax.amountTtc;
 
       // Validation finale
       if (amountTtc === 0) {
@@ -174,12 +196,13 @@ export default function Invoices() {
 
       // Écriture TVA (toujours créer si montants > 0)
       if (amountTva > 0) {
+        const taxAccount = vatAccounts(company?.accounting_plan, invoiceType).code;
         entriesToCreate.push({
           company_id: invoice.company_id,
           entry_number: entryNumber,
           date: invoice.date,
           journal: journal,
-          account_code: invoiceType === 'client' ? '44571' : '44566',
+          account_code: taxAccount,
           account_label: invoiceType === 'client' ? 'TVA collectée' : 'TVA déductible',
           label: `TVA Facture ${invoice.invoice_number}`,
           debit: invoiceType === 'fournisseur' ? amountTva : 0,

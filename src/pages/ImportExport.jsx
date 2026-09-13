@@ -6,6 +6,7 @@ import { getSupabaseErrorMessage, toastSupabaseError } from '@/lib/supabase-erro
 import { buildFecRows, fecFileName, serializeFec, validateFec } from '@/lib/fec';
 import { detectAccountingAnomalies } from '@/lib/accounting';
 import { duplicateIndexes, duplicateKey, normalizeDuplicateValue } from '@/lib/import-validation';
+import { accountingPlanCurrencyError, parseStructuredData, serializeCsv, serializeJson, validateAccountPlanRows } from '@/lib/data-transfer';
 import { format } from 'date-fns';
 import { useUser } from '@/components/hooks/useUser';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
@@ -129,7 +130,7 @@ export default function ImportExport() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('companies')
-        .select('id, name, siret')
+        .select('id, name, siret, accounting_plan, currency')
         .eq('id', user.active_company_id)
         .maybeSingle();
       if (error) throw error;
@@ -163,12 +164,13 @@ export default function ImportExport() {
 
     // Vérifier la taille selon le type de fichier
     const supportedAiTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const isStructuredFile = ['.csv', '.json'].some((extension) => file.name.toLowerCase().endsWith(extension));
     const maxSize = 15 * 1024 * 1024;
 
-    if (!supportedAiTypes.includes(file.type)) {
+    if (!isStructuredFile && !supportedAiTypes.includes(file.type)) {
       setUploadResult({
         success: false,
-        message: 'Ce parcours IA accepte uniquement les PDF et images JPG, PNG, WEBP ou GIF.'
+        message: 'Formats acceptés : CSV, JSON, PDF et images JPG, PNG, WEBP ou GIF.'
       });
       return;
     }
@@ -185,9 +187,18 @@ export default function ImportExport() {
     setUploadResult(null);
 
     try {
-      const { path: filePath, url: fileUrl } = await uploadDocument(file, user.active_company_id);
+      const fileFormat = file.name.toLowerCase().endsWith('.json') ? 'json' : 'csv';
+      const isStructuredFile = ['.csv', '.json'].some((extension) => file.name.toLowerCase().endsWith(extension));
+      let data = [];
+      let fileUrl = null;
 
-      const schemas = {
+      if (isStructuredFile) {
+        data = parseStructuredData(await file.text(), importType, fileFormat);
+      } else {
+        const { path: filePath, url } = await uploadDocument(file, user.active_company_id);
+        fileUrl = url;
+
+        const schemas = {
         invoices: {
           type: 'object',
           properties: {
@@ -281,23 +292,17 @@ export default function ImportExport() {
         }
       };
 
-      const output = await extractStructuredData({
-        companyId: user.active_company_id,
-        prompt: `Le document est destiné à l'import de ${importType}. Extrais uniquement les données de ce type, sans mélanger d'autres types. Respecte strictement le schéma JSON : dates YYYY-MM-DD et montants numériques. N'invente aucune donnée ; si un champ obligatoire est illisible, retourne une erreur plutôt qu'une valeur de remplacement.`,
-        filePaths: [filePath],
-        schema: schemas[importType]
-      });
+        const output = await extractStructuredData({
+          companyId: user.active_company_id,
+          prompt: `Le document est destiné à l'import de ${importType}. Extrais uniquement les données de ce type, sans mélanger d'autres types. Respecte strictement le schéma JSON : dates YYYY-MM-DD et montants numériques. N'invente aucune donnée ; si un champ obligatoire est illisible, retourne une erreur plutôt qu'une valeur de remplacement.`,
+          filePaths: [filePath],
+          schema: schemas[importType]
+        });
 
-      let data = [];
-      
-      if (importType === 'invoices' && output.invoices) {
-        data = output.invoices;
-      } else if (importType === 'thirdparties' && output.thirdparties) {
-        data = output.thirdparties;
-      } else if (importType === 'entries' && output.entries) {
-        data = output.entries;
-      } else if (importType === 'accounts' && output.accounts) {
-        data = output.accounts;
+        if (importType === 'invoices' && output.invoices) data = output.invoices;
+        else if (importType === 'thirdparties' && output.thirdparties) data = output.thirdparties;
+        else if (importType === 'entries' && output.entries) data = output.entries;
+        else if (importType === 'accounts' && output.accounts) data = output.accounts;
       }
 
       if (!Array.isArray(data) || data.length === 0) {
@@ -405,6 +410,17 @@ export default function ImportExport() {
           }
         }
       } else if (importType === 'accounts') {
+        const planCurrencyError = accountingPlanCurrencyError(company?.accounting_plan || 'PCG', company?.currency || 'EUR');
+        if (planCurrencyError) {
+          setUploadResult({ success: false, message: planCurrencyError });
+          return;
+        }
+        const planValidation = validateAccountPlanRows(data, company?.accounting_plan || 'PCG');
+        if (!planValidation.valid) {
+          setUploadResult({ success: false, message: planValidation.errors.slice(0, 5).join('\n') });
+          return;
+        }
+        data = planValidation.rows;
         // Charger les comptes existants pour vérifier les doublons
         const existingAccounts = accounts;
         const existingAccountCodes = new Set(existingAccounts.map((account) => normalizeDuplicateValue(account.code)));
@@ -683,17 +699,14 @@ export default function ImportExport() {
       }
 
       if (data.length > 0) {
-        const headers = Object.keys(data[0]);
-        const csv = [
-          headers.join(';'),
-          ...data.map(row => headers.map(h => `"${row[h] || ''}"`).join(';'))
-        ].join('\n');
-
-        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+        const content = exportFormat === 'json' ? serializeJson(data) : serializeCsv(data);
+        const mimeType = exportFormat === 'json' ? 'application/json;charset=utf-8;' : 'text/csv;charset=utf-8;';
+        const extension = exportFormat === 'json' ? 'json' : 'csv';
+        const blob = new Blob([exportFormat === 'json' ? content : `\ufeff${content}`], { type: mimeType });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${filename}.csv`;
+        link.download = `${filename}.${extension}`;
         link.click();
         URL.revokeObjectURL(url);
       }
@@ -824,8 +837,13 @@ export default function ImportExport() {
               <CardHeader>
                 <CardTitle>Importer des données</CardTitle>
                 <CardDescription>
-                  Importez vos données depuis un fichier CSV, Excel ou PDF multi-pages
+                  Importez vos données depuis un fichier CSV, JSON, PDF ou image
                 </CardDescription>
+                {importType === 'accounts' && (
+                  <CardDescription className="font-medium text-slate-700">
+                    Plan actif : {company?.accounting_plan || 'PCG'} · monnaie : {company?.currency || 'EUR'} · les doublons et incompatibilités seront rejetés.
+                  </CardDescription>
+                )}
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
@@ -865,7 +883,7 @@ export default function ImportExport() {
                             Glissez un fichier ou cliquez pour sélectionner
                           </p>
                           <p className="text-xs text-slate-400 mt-1">
-                            PDF ou image (JPG, PNG, WEBP, GIF)
+                            CSV ou JSON pour les données structurées, PDF ou image pour l'analyse IA
                           </p>
                         </>
                       )}
@@ -873,7 +891,7 @@ export default function ImportExport() {
                     <input
                       type="file"
                       className="hidden"
-                      accept=".pdf,image/jpeg,image/png,image/webp,image/gif"
+                      accept=".csv,.json,.pdf,image/jpeg,image/png,image/webp,image/gif"
                       onChange={handleFileUpload}
                       disabled={uploading}
                     />
@@ -1001,6 +1019,7 @@ export default function ImportExport() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="csv">CSV (Excel compatible)</SelectItem>
+                      <SelectItem value="json">JSON</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
