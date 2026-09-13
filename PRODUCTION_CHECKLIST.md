@@ -19,10 +19,10 @@ Cette checklist couvre les éléments restant à traiter avant de déclarer Sade
 
 ### Base distante
 
-- [x] Migrations Supabase synchronisées jusqu’à `0027`.
+- [x] Migrations Supabase synchronisées jusqu’à `0028`.
 - [ ] Vérifier les tables `0023` à `0027` dans la base distante.
 - [ ] Vérifier les policies RLS du module Performance.
-- [ ] Exécuter un test d’intégration avec au moins deux sociétés.
+- [x] Exécuter un test d’intégration avec au moins deux sociétés (`87/87`).
 - [ ] Vérifier les sauvegardes et la restauration sur une base de test.
 
 ### CI et navigateur
@@ -31,7 +31,7 @@ Cette checklist couvre les éléments restant à traiter avant de déclarer Sade
 - [x] La CI installe Chromium avec `npx playwright install --with-deps chromium`.
 - [ ] Installer `libnspr4` localement pour exécuter Playwright.
 - [ ] Exécuter `npm run test:e2e` localement.
-- [ ] Vérifier le job E2E sur GitHub Actions.
+- [ ] Vérifier le job E2E sur GitHub Actions (scénarios ajoutés, dernier workflow en échec à diagnostiquer).
 
 ## P1 - Fonctionnalités métier indispensables
 
@@ -98,7 +98,8 @@ Cette checklist couvre les éléments restant à traiter avant de déclarer Sade
 
 ### Tests Playwright métier
 
-- [ ] Connexion et sélection de société.
+- [x] Scénarios ajoutés pour KPI, objectifs, budgets, écarts et plans d’action (`tests/e2e/performance.spec.js`).
+- [ ] Connexion et sélection de société avec un compte E2E GitHub.
 - [ ] Création d’un KPI.
 - [ ] Création d’un objectif et d’une version.
 - [ ] Création d’un budget et vérification d’une version.
@@ -113,11 +114,11 @@ Cette checklist couvre les éléments restant à traiter avant de déclarer Sade
 
 ### KPI et alertes automatiques
 
-- [ ] Implémenter le moteur d’évaluation périodique des KPI personnalisés.
-- [ ] Enregistrer chaque valeur dans `kpi_values` avec sa période et son snapshot source.
-- [ ] Déclencher automatiquement les alertes au franchissement des seuils.
-- [ ] Dédupliquer les alertes par KPI, période et objet.
-- [ ] Relier automatiquement les alertes critiques à un plan d’action.
+- [x] Implémenter le moteur d’évaluation périodique des KPI personnalisés (`api/evaluate-performance-kpis.js`).
+- [x] Enregistrer chaque valeur dans `kpi_values` avec sa période et son snapshot source.
+- [x] Déclencher automatiquement les alertes au franchissement des seuils.
+- [x] Dédupliquer les alertes KPI ouvertes par société et KPI.
+- [x] Relier automatiquement les alertes critiques à un plan d’action.
 
 ### Sécurité npm
 

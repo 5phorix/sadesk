@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import generateNotifications from './generate-notifications.js';
+import { evaluateCompanyKpis } from './evaluate-performance-kpis.js';
 
 const invokeForCompany = (companyId) => new Promise((resolve) => {
   const result = {
@@ -35,12 +36,15 @@ export default async function handler(request, response) {
     const { data: companies, error } = await adminClient.from('companies').select('id');
     if (error) throw error;
 
+    const kpiResults = await Promise.all((companies || []).map((company) => evaluateCompanyKpis(adminClient, company.id)));
+
     const results = await Promise.all((companies || []).map((company) => invokeForCompany(company.id)));
     const failures = results.filter(({ code }) => code >= 400);
     return response.status(failures.length ? 207 : 200).json({
       success: failures.length === 0,
       companies_processed: results.length,
-      failures: failures.length
+      failures: failures.length,
+      kpi_results: kpiResults
     });
   } catch (error) {
     console.error('Notification cron failed:', error);
