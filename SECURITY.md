@@ -34,6 +34,6 @@ Verification par un mainteneur dans GitHub : `Settings > Secrets and variables >
 4. Revoquer l'ancien secret chez le fournisseur.
 5. Verifier les journaux sans afficher de valeur sensible et consigner la date de rotation.
 
-Secrets concernes : `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_PUBLIC_URL`, `AI_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM` et `CRON_SECRET`.
+Secrets concernes : `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_PUBLIC_URL`, `AI_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`, `E2E_EMAIL` et `E2E_PASSWORD`.
 
 Le job E2E ne depend pas de secrets Supabase : il installe Chromium avec ses dependances Linux et execute le smoke test navigateur.
