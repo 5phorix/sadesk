@@ -72,6 +72,8 @@ Voir [SECURITY.md](SECURITY.md) pour l'isolement de `xlsx`, l'audit npm et la v�
 
 Voir [ARCHITECTURE.md](ARCHITECTURE.md) pour les niveaux produit, les responsabilités des modules et les règles de cloisonnement.
 
+Voir [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md) pour le suivi des prérequis et chantiers restants avant la mise en production.
+
 **Tests d'intégration**
 
 Ils vérifient le cloisonnement des données entre sociétés et les permissions des rôles
