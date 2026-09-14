@@ -65,11 +65,11 @@ export default function CashForecast() {
       return { date: weekStart, label: format(weekStart, 'dd MMM', { locale: fr }), encaissements: incoming * config.inflow, décaissements: outgoing * config.outflow, mouvements: bankMovement, solde: 0 };
     });
     let balance = Number(currentBalance || 0);
-    forecast.forEach((week) => { balance += week.encaissements - week.décaissements + week.mouvements; week.solde = balance; });
-    const totalInflows = forecast.reduce((sum, week) => sum + week.encaissements, 0);
-    const totalOutflows = forecast.reduce((sum, week) => sum + week.décaissements, 0);
-    const lowest = forecast.reduce((lowestPoint, week) => week.solde < lowestPoint.solde ? week : lowestPoint, forecast[0]);
-    return { currentBalance: Number(currentBalance || 0), forecast, totalInflows, totalOutflows, lowest, openClientInvoices, openSupplierInvoices };
+    weeks.forEach((week) => { balance += week.encaissements - week.décaissements + week.mouvements; week.solde = balance; });
+    const totalInflows = weeks.reduce((sum, week) => sum + week.encaissements, 0);
+    const totalOutflows = weeks.reduce((sum, week) => sum + week.décaissements, 0);
+    const lowest = weeks.reduce((lowestPoint, week) => week.solde < lowestPoint.solde ? week : lowestPoint, weeks[0]);
+    return { currentBalance: Number(currentBalance || 0), forecast: weeks, totalInflows, totalOutflows, lowest, openClientInvoices, openSupplierInvoices };
   }, [invoices, scenario, transactions, settings]);
 
   const daysToTension = forecast.lowest?.solde < 0 ? differenceInDays(forecast.lowest.date, new Date()) : null;

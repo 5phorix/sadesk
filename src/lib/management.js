@@ -139,15 +139,165 @@ export function explainVariance({ budgeted = 0, actual = 0, objective = null, ca
 
 export const COSTING_METHODS = ['FULL_COST', 'VARIABLE_COST', 'DIRECT_COST', 'STANDARD_COST', 'ABC', 'MARGINAL_COST'];
 
+export const COSTING_METHOD_DETAILS = {
+  FULL_COST: {
+    label: 'Coût complet (Centres d’analyse)',
+    shortDescription: 'Incorpore l’intégralité des charges directes et quote-part de charges indirectes.',
+    formula: 'Coût Total = Coûts Directs + Coûts Indirects'
+  },
+  VARIABLE_COST: {
+    label: 'Coût variable (Direct Costing simple)',
+    shortDescription: 'Seules les charges variant avec le niveau d’activité sont imputées à l’objet.',
+    formula: 'Marge / Coût Variable = Chiffre d’Affaires - Coûts Variables'
+  },
+  DIRECT_COST: {
+    label: 'Coût direct (Direct Costing évolué)',
+    shortDescription: 'Prend en compte l’ensemble des charges directes (variables et fixes spécifiques).',
+    formula: 'Coût Direct = Directs Variables + Directs Fixes Spécifiques'
+  },
+  STANDARD_COST: {
+    label: 'Coût standard & Analyse des écarts',
+    shortDescription: 'Compare le coût réel constaté au coût préétabli théorique ou budgété.',
+    formula: 'Écart Global = Coût Réel - Coût Standard'
+  },
+  ABC: {
+    label: 'Méthode ABC (Activity-Based Costing)',
+    shortDescription: 'Impute les charges indirectes via les inducteurs de coûts des activités consommées.',
+    formula: 'Coût Total = Coûts Directs + (Volume Inducteur × Coût Unitaire Inducteur)'
+  },
+  MARGINAL_COST: {
+    label: 'Coût marginal (Analyse différentielle)',
+    shortDescription: 'Mesure le coût engendré par la production d’une série ou unité supplémentaire.',
+    formula: 'Coût Marginal = Coût Unitaire Additionnel × Quantité Supplémentaire'
+  }
+};
+
 /** Calcule le coût d'un objet selon une méthode explicite et traçable. */
-export function calculateCost({ method, directCosts = 0, indirectCosts = 0, variableCosts = 0, fixedCosts = 0, standardCost = null, driverValue = 0, driverRate = 0, marginalUnitCost = 0, quantity = 1 }) {
+export function calculateCost({
+  method = 'FULL_COST',
+  directCosts = 0,
+  indirectCosts = 0,
+  variableCosts = 0,
+  fixedCosts = 0,
+  standardCost = null,
+  driverName = '',
+  driverValue = 0,
+  driverRate = 0,
+  marginalUnitCost = 0,
+  sellingPrice = 0,
+  quantity = 1
+}) {
   const direct = round2(directCosts);
   const indirect = round2(indirectCosts);
   const variable = round2(variableCosts);
   const fixed = round2(fixedCosts);
+  const qte = Math.max(0.0001, Number(quantity) || 1);
+  const price = round2(sellingPrice);
+  const turnover = round2(price * (Number(quantity) || 1));
+
   const allocated = round2(Number(driverValue) * Number(driverRate));
-  const total = method === 'FULL_COST' ? direct + indirect : method === 'VARIABLE_COST' ? variable : method === 'DIRECT_COST' ? direct : method === 'STANDARD_COST' ? (direct + indirect || round2(standardCost || 0)) : method === 'ABC' ? direct + allocated : round2(Number(marginalUnitCost) * Number(quantity));
-  return { method, directCosts: direct, indirectCosts: indirect, variableCosts: variable, fixedCosts: fixed, allocatedIndirectCosts: allocated, total: round2(total), unitCost: quantity ? round2(total / Number(quantity)) : 0, variance: standardCost === null ? null : round2(total - Number(standardCost)) };
+
+  let total = 0;
+  let breakdown = {};
+  let variance = null;
+  let margin = null;
+  let marginRate = null;
+  let isFavorable = null;
+
+  switch (method) {
+    case 'FULL_COST': {
+      total = round2(direct + indirect);
+      breakdown = { direct, indirect };
+      if (price > 0) {
+        margin = round2(turnover - total);
+        marginRate = turnover > 0 ? round2((margin / turnover) * 100) : 0;
+      }
+      break;
+    }
+    case 'VARIABLE_COST': {
+      total = round2(variable);
+      const mcv = round2(turnover - variable);
+      const tauxMCV = turnover > 0 ? round2((mcv / turnover) * 100) : 0;
+      const resultatExploitation = round2(mcv - fixed);
+      const seuilRentabilite = tauxMCV > 0 ? round2(fixed / (tauxMCV / 100)) : 0;
+      breakdown = { variable, fixed, mcv, tauxMCV, resultatExploitation, seuilRentabilite };
+      margin = mcv;
+      marginRate = tauxMCV;
+      break;
+    }
+    case 'DIRECT_COST': {
+      total = round2(direct);
+      breakdown = { directVariable: variable, directFixed: fixed, directTotal: direct };
+      if (price > 0) {
+        margin = round2(turnover - direct);
+        marginRate = turnover > 0 ? round2((margin / turnover) * 100) : 0;
+      }
+      break;
+    }
+    case 'STANDARD_COST': {
+      const realCost = direct + indirect > 0 ? round2(direct + indirect) : round2(direct);
+      total = realCost || (standardCost !== null ? round2(standardCost) : 0);
+      if (standardCost !== null && standardCost !== undefined && standardCost !== '') {
+        const std = round2(standardCost);
+        variance = round2(total - std);
+        isFavorable = variance <= 0;
+        const variancePercent = std > 0 ? round2((variance / std) * 100) : 0;
+        breakdown = { standard: std, real: total, variance, isFavorable, variancePercent };
+      } else {
+        breakdown = { real: total };
+      }
+      break;
+    }
+    case 'ABC': {
+      total = round2(direct + allocated);
+      breakdown = {
+        direct,
+        driverName: driverName || 'Inducteur',
+        driverValue: Number(driverValue),
+        driverRate: Number(driverRate),
+        allocatedIndirect: allocated
+      };
+      if (price > 0) {
+        margin = round2(turnover - total);
+        marginRate = turnover > 0 ? round2((margin / turnover) * 100) : 0;
+      }
+      break;
+    }
+    case 'MARGINAL_COST': {
+      const unitMarginal = round2(marginalUnitCost);
+      total = round2(unitMarginal * (Number(quantity) || 1));
+      const incrementalRevenue = round2(price * (Number(quantity) || 1));
+      const incrementalMargin = round2(incrementalRevenue - total);
+      const isProfitable = price > 0 ? incrementalMargin >= 0 : null;
+      breakdown = { unitMarginal, incrementalRevenue, incrementalMargin, isProfitable };
+      margin = incrementalMargin;
+      marginRate = incrementalRevenue > 0 ? round2((incrementalMargin / incrementalRevenue) * 100) : 0;
+      break;
+    }
+    default:
+      total = round2(direct + indirect);
+      breakdown = { direct, indirect };
+  }
+
+  const unitCost = round2(total / qte);
+
+  return {
+    method,
+    directCosts: direct,
+    indirectCosts: indirect,
+    variableCosts: variable,
+    fixedCosts: fixed,
+    allocatedIndirectCosts: allocated,
+    total: round2(total),
+    unitCost,
+    sellingPrice: price,
+    turnover,
+    margin,
+    marginRate,
+    variance: variance !== null ? variance : (standardCost === null || standardCost === undefined || standardCost === '' ? null : round2(total - Number(standardCost))),
+    isFavorable,
+    breakdown
+  };
 }
 
 /** Projette un atterrissage selon un scénario de chiffre d'affaires et de charges. */

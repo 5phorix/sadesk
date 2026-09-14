@@ -8,6 +8,8 @@ import { detectAccountingAnomalies } from '@/lib/accounting';
 import { duplicateIndexes, duplicateKey, normalizeDuplicateValue } from '@/lib/import-validation';
 import { accountingPlanCurrencyError, parseStructuredData, serializeCsv, serializeJson, validateAccountPlanRows } from '@/lib/data-transfer';
 import { format } from 'date-fns';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 import { useUser } from '@/components/hooks/useUser';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { 
@@ -56,7 +58,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import PageHeader from '@/components/common/PageHeader';
 import { cn } from '@/lib/utils';
 
 export default function ImportExport() {
@@ -748,11 +749,32 @@ export default function ImportExport() {
 
   return (
     <ProtectedRoute>
-      <div className="space-y-6">
-      <PageHeader
-        title="Import / Export"
-        subtitle="Importez et exportez vos données comptables"
-      />
+      <div className="space-y-6 pb-16">
+        {/* En-tête coloré Slate / Ardoise */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-2 border-b border-slate-200/80">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
+                Import / Export & Fichier FEC
+              </h1>
+              <Badge variant="outline" className="font-mono text-xs px-2.5 py-1 bg-slate-100 text-slate-800 border-slate-300">
+                Échanges & Conformité
+              </Badge>
+            </div>
+            <p className="text-slate-500 mt-1 text-sm lg:text-base">
+              Transfert de données comptables, exports normalisés (CSV/JSON) et Fichier des Écritures Comptables (FEC)
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <Link to={createPageUrl('BackupRestore')}>
+              <Button variant="outline" className="gap-2 text-xs bg-white border-slate-200">
+                <FileCheck className="h-4 w-4 text-slate-600" />
+                Sauvegarde & Restauration
+              </Button>
+            </Link>
+          </div>
+        </div>
 
       {anomalies.length > 0 && (
         <Card className="border-amber-200 bg-amber-50">

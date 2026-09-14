@@ -35,7 +35,9 @@ import {
   Shield,
   Bell,
   History,
-  CheckCircle2
+  CheckCircle2,
+  Lightbulb,
+  Scale
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SearchCommand from '@/components/common/SearchCommand';
@@ -51,104 +53,84 @@ import {
 
 const navSections = [
   {
-    title: 'Outils Administratifs',
+    title: 'Comptabilité & Déclarations',
+    color: 'text-blue-700',
+    dotColor: 'bg-blue-600',
+    sectionBg: 'bg-blue-50/35 border-blue-200/70',
+    headerBg: 'bg-blue-100/50 text-blue-950 hover:bg-blue-100/80',
+    activeBg: 'bg-blue-700 text-white shadow-sm shadow-blue-700/20',
+    hoverBg: 'text-slate-700 hover:bg-blue-100/60 hover:text-blue-950',
+    iconDefault: 'bg-blue-100/80 text-blue-700',
     items: [
-      { name: 'Tableau de bord', icon: LayoutDashboard, page: 'Dashboard' },
-      { name: 'Tâches', icon: CheckCircle2, page: 'Tasks' },
-      { name: 'Notifications', icon: Bell, page: 'NotificationSettings' },
-      { name: 'Paramètres', icon: Settings, page: 'Settings' },
+      { name: 'Écritures', icon: Receipt, page: 'Entries', iconColor: 'text-blue-600' },
+      { name: 'Journaux', icon: BookOpen, page: 'Journals', iconColor: 'text-blue-600' },
+      { name: 'Plan comptable', icon: BookOpen, page: 'Accounts', iconColor: 'text-blue-600' },
+      { name: 'Factures', icon: FileText, page: 'Invoices', iconColor: 'text-blue-600' },
+      { name: 'Scanner facture', icon: Camera, page: 'ScanInvoice', iconColor: 'text-blue-600' },
+      { name: 'Lettrage', icon: Link2, page: 'Lettering', iconColor: 'text-blue-600' },
+      { name: 'Rapprochement', icon: Calculator, page: 'BankReconciliation', iconColor: 'text-blue-600' },
+      { name: 'Bilan & SIG', icon: Scale, page: 'FinancialStatements', iconColor: 'text-blue-600' },
+      { name: 'Grand Livre & Balance', icon: BarChart3, page: 'Reports', iconColor: 'text-blue-600' },
+      { name: 'Immobilisations', icon: Landmark, page: 'FixedAssets', iconColor: 'text-blue-600' },
+      { name: 'Clôtures mensuelles', icon: CalendarCheck, page: 'MonthlyClosing', iconColor: 'text-blue-600' },
+      { name: 'Contrôles comptables', icon: Shield, page: 'Controls', iconColor: 'text-blue-600' },
     ]
   },
   {
-    Lightbulb,
+    title: 'Trésorerie & Gestion',
+    color: 'text-teal-700',
+    dotColor: 'bg-teal-600',
+    sectionBg: 'bg-teal-50/35 border-teal-200/70',
+    headerBg: 'bg-teal-100/50 text-teal-950 hover:bg-teal-100/80',
+    activeBg: 'bg-teal-700 text-white shadow-sm shadow-teal-700/20',
+    hoverBg: 'text-slate-700 hover:bg-teal-100/60 hover:text-teal-950',
+    iconDefault: 'bg-teal-100/80 text-teal-700',
     items: [
-      { name: 'Contrôles', icon: Shield, page: 'Controls' },
-      { name: 'Factures', icon: FileText, page: 'Invoices' },
-      { name: 'Scanner facture', icon: Camera, page: 'ScanInvoice' },
-      { name: 'Écritures', icon: Receipt, page: 'Entries' },
-      { name: 'Journaux', icon: BookOpen, page: 'Journals' },
-      { name: 'Plan comptable', icon: BookOpen, page: 'Accounts' },
-      { name: 'Lettrage', icon: Link2, page: 'Lettering' },
-      { name: 'Rapprochement bancaire', icon: Calculator, page: 'BankReconciliation' },
-      { name: 'États Financiers', icon: FileText, page: 'FinancialStatements' },
-      { name: 'Créances et relances', icon: Bell, page: 'Receivables' },
-      { name: 'Immobilisations', icon: Landmark, page: 'FixedAssets' },
+      { name: 'Prévision trésorerie', icon: Waves, page: 'CashForecast', iconColor: 'text-teal-600' },
+      { name: 'Gestion Financière', icon: TrendingUp, page: 'FinancialManagement', iconColor: 'text-teal-600' },
+      { name: 'Créances & Relances', icon: Bell, page: 'Receivables', iconColor: 'text-teal-600' },
+      { name: 'Suivi budgétaire', icon: Gauge, page: 'BudgetTracking', iconColor: 'text-teal-600' },
+      { name: 'Rentabilité', icon: PieChart, page: 'Profitability', iconColor: 'text-teal-600' },
+      { name: 'Compta analytique', icon: Target, page: 'AnalyticalAccounting', iconColor: 'text-teal-600' },
+      { name: 'Calcul des coûts', icon: Calculator, page: 'Costing', iconColor: 'text-teal-600' },
+      { name: 'Indicateurs Performance', icon: Gauge, page: 'Performance', iconColor: 'text-teal-600' },
+      { name: 'Aide à la décision', icon: Lightbulb, page: 'DecisionAssistant', iconColor: 'text-teal-600' },
     ]
   },
   {
-    title: 'Contrôle de gestion',
+    title: 'Commercial & Opérations',
+    color: 'text-amber-700',
+    dotColor: 'bg-amber-600',
+    sectionBg: 'bg-amber-50/35 border-amber-200/70',
+    headerBg: 'bg-amber-100/50 text-amber-950 hover:bg-amber-100/80',
+    activeBg: 'bg-amber-700 text-white shadow-sm shadow-amber-700/20',
+    hoverBg: 'text-slate-700 hover:bg-amber-100/60 hover:text-amber-950',
+    iconDefault: 'bg-amber-100/80 text-amber-700',
     items: [
-      { name: 'Suivi budgétaire', icon: Gauge, page: 'BudgetTracking' },
-      { name: 'Rentabilité', icon: PieChart, page: 'Profitability' },
-      { name: 'Analytique', icon: Target, page: 'AnalyticalAccounting' },
-      { name: 'Clôtures mensuelles', icon: CalendarCheck, page: 'MonthlyClosing' },
+      { name: 'Clients & Fournisseurs', icon: Building2, page: 'ThirdParties', iconColor: 'text-amber-600' },
+      { name: 'Gestion des stocks', icon: Package, page: 'StockManagement', iconColor: 'text-amber-600' },
+      { name: 'Documents & GED', icon: FolderOpen, page: 'Documents', iconColor: 'text-amber-600' },
+      { name: 'Tâches & Équipe', icon: CheckCircle2, page: 'Tasks', iconColor: 'text-amber-600' },
     ]
   },
   {
-    title: 'Analyse et décision',
+    title: 'Administration & Système',
+    color: 'text-slate-700',
+    dotColor: 'bg-slate-600',
+    sectionBg: 'bg-slate-100/45 border-slate-200/80',
+    headerBg: 'bg-slate-200/60 text-slate-950 hover:bg-slate-200/90',
+    activeBg: 'bg-slate-800 text-white shadow-sm shadow-slate-800/20',
+    hoverBg: 'text-slate-700 hover:bg-slate-200/60 hover:text-slate-950',
+    iconDefault: 'bg-slate-200/80 text-slate-700',
     items: [
-      { name: 'Performance', icon: Gauge, page: 'Performance' },
-      { name: 'Analyser', icon: BarChart3, page: 'Analysis' },
-      { name: 'KPI personnalisés', icon: Gauge, page: 'KpiManagement' },
-      { name: 'Objectifs', icon: Target, page: 'Objectives' },
-      { name: 'Analyse des écarts', icon: BarChart3, page: 'VarianceAnalysis' },
-      { name: 'Calcul des coûts', icon: Calculator, page: 'Costing' },
-      { name: 'Prévisions & scénarios', icon: TrendingUp, page: 'ForecastScenarios' },
-      { name: 'Alertes performance', icon: Bell, page: 'PerformanceAlerts' },
-      { name: 'Plans d’action', icon: CheckCircle2, page: 'ActionPlans' },
-      { name: 'Aider à décider', icon: Lightbulb, page: 'DecisionAssistant' },
-    ]
-  },
-  {
-    title: 'Gestion des Tiers',
-    items: [
-      { name: 'Tiers', icon: Building2, page: 'ThirdParties' },
-    ]
-  },
-  {
-    title: 'Gestion des Stocks',
-    items: [
-      { name: 'Stocks', icon: Package, page: 'StockManagement' },
-    ]
-  },
-  {
-    title: 'Gestion des Documents',
-    items: [
-      { name: 'Documents', icon: FolderOpen, page: 'Documents' },
-    ]
-  },
-  {
-    title: 'Utilisateurs et Permissions',
-    items: [
-      { name: 'Utilisateurs', icon: Users, page: 'CompanyUsers' },
-      { name: 'Rôles & Permissions', icon: Shield, page: 'RolesManagement' },
-      { name: "Journal d'audit", icon: History, page: 'AuditLog' },
-    ]
-  },
-  {
-    title: 'Rapports',
-    items: [
-      { name: 'Rapports', icon: BarChart3, page: 'Reports' },
-    ]
-  },
-  {
-    title: 'Import/Export',
-    items: [
-      { name: 'Import/Export', icon: Upload, page: 'ImportExport' },
-      { name: 'Sauvegarde / restauration', icon: History, page: 'BackupRestore' },
-    ]
-  },
-  {
-    title: 'Gestion Financière',
-    items: [
-      { name: 'Gestion Financière', icon: TrendingUp, page: 'FinancialManagement' },
-      { name: 'Prévision de trésorerie', icon: Waves, page: 'CashForecast' },
-    ]
-  },
-  {
-    title: 'Documentation',
-    items: [
-      { name: 'Documentation', icon: BookOpen, page: 'Documentation' },
+      { name: 'Utilisateurs', icon: Users, page: 'CompanyUsers', iconColor: 'text-slate-600' },
+      { name: 'Rôles & Permissions', icon: Shield, page: 'RolesManagement', iconColor: 'text-slate-600' },
+      { name: "Journal d'audit", icon: History, page: 'AuditLog', iconColor: 'text-slate-600' },
+      { name: 'Import / Export FEC', icon: Upload, page: 'ImportExport', iconColor: 'text-slate-600' },
+      { name: 'Sauvegarde / Restauration', icon: History, page: 'BackupRestore', iconColor: 'text-slate-600' },
+      { name: 'Notifications', icon: Bell, page: 'NotificationSettings', iconColor: 'text-slate-600' },
+      { name: 'Paramètres', icon: Settings, page: 'Settings', iconColor: 'text-slate-600' },
+      { name: 'Guide & Documentation', icon: BookOpen, page: 'Documentation', iconColor: 'text-slate-600' },
     ]
   }
 ];
@@ -157,18 +139,48 @@ export default function Layout({ children, currentPageName }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  
+  // Section active par défaut en fonction de la page affichée
   const [openSections, setOpenSections] = useState(() => {
-    const saved = localStorage.getItem('nav-sections-open');
-    return saved ? JSON.parse(saved) : ['Outils Administratifs', 'Gestion Comptable'];
+    const validTitles = navSections.map(s => s.title);
+    const saved = localStorage.getItem('nav-sections-open-v2');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter(t => validTitles.includes(t));
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return validTitles; // Par défaut, tout est visible et accessible
   });
+  
   const { user } = useUser();
+
+  // Ouvre automatiquement la section contenant la page en cours de visite
+  React.useEffect(() => {
+    if (!currentPageName) return;
+    const currentSection = navSections.find(sec => sec.items.some(it => it.page === currentPageName));
+    if (currentSection) {
+      setOpenSections(prev => {
+        if (!prev.includes(currentSection.title)) {
+          const updated = [...prev, currentSection.title];
+          localStorage.setItem('nav-sections-open-v2', JSON.stringify(updated));
+          return updated;
+        }
+        return prev;
+      });
+    }
+  }, [currentPageName]);
 
   const toggleSection = (title) => {
     setOpenSections(prev => {
       const newSections = prev.includes(title)
         ? prev.filter(s => s !== title)
         : [...prev, title];
-      localStorage.setItem('nav-sections-open', JSON.stringify(newSections));
+      localStorage.setItem('nav-sections-open-v2', JSON.stringify(newSections));
       return newSections;
     });
   };
@@ -300,25 +312,66 @@ export default function Layout({ children, currentPageName }) {
         )}
 
         {/* Navigation */}
-        <nav className="p-3 pb-20 space-y-6">
+        <nav className="p-3 pb-24 space-y-3.5">
+          {/* Lien direct Tableau de bord */}
+          <div className="pb-1">
+            <Link
+              to={createPageUrl('Dashboard')}
+              onClick={() => setMobileOpen(false)}
+              title={collapsed ? "Tableau de bord" : undefined}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group text-sm border",
+                currentPageName === 'Dashboard' 
+                  ? "bg-[#1e3a5f] text-white font-bold shadow-md shadow-[#1e3a5f]/20 border-[#1e3a5f]" 
+                  : "bg-white text-slate-800 hover:bg-slate-100 border-slate-200/80 font-semibold shadow-2xs"
+              )}
+            >
+              <div className={cn(
+                "p-1.5 rounded-lg transition-colors flex items-center justify-center shrink-0",
+                currentPageName === 'Dashboard' 
+                  ? "bg-white/20 text-white" 
+                  : "bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"
+              )}>
+                <LayoutDashboard className="h-4 w-4" />
+              </div>
+              {!collapsed && (
+                <span className="truncate">Tableau de bord</span>
+              )}
+            </Link>
+          </div>
+
+          {/* Sections structurées en 4 grands pôles avec couleurs de fond dédiées */}
           {navSections.map((section) => {
             const isOpen = openSections.includes(section.title);
             return (
-              <div key={section.title}>
+              <div 
+                key={section.title} 
+                className={cn(
+                  "rounded-2xl transition-all duration-200 border",
+                  collapsed ? "p-1 space-y-1 bg-white border-slate-200" : cn("p-1.5 space-y-1 shadow-2xs", section.sectionBg)
+                )}
+              >
                 {!collapsed && (
                   <button
+                    type="button"
                     onClick={() => toggleSection(section.title)}
-                    className="w-full flex items-center justify-between px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider hover:text-slate-600 transition-colors"
+                    className={cn(
+                      "w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors",
+                      section.headerBg
+                    )}
                   >
-                    <span>{section.title}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={cn("w-2 h-2 rounded-full shrink-0 shadow-xs", section.dotColor || 'bg-slate-400')} />
+                      <span className="truncate text-[11px]">{section.title}</span>
+                    </div>
                     <ChevronRight className={cn(
-                      "h-3 w-3 transition-transform",
+                      "h-3.5 w-3.5 transition-transform shrink-0 opacity-70",
                       isOpen && "rotate-90"
                     )} />
                   </button>
                 )}
                 {(collapsed || isOpen) && (
-                  <div className="space-y-1">
+                  <div className="space-y-0.5 pt-0.5">
                     {section.items.map((item) => {
                       const isActive = currentPageName === item.page;
                       return (
@@ -326,19 +379,24 @@ export default function Layout({ children, currentPageName }) {
                           key={item.page}
                           to={createPageUrl(item.page)}
                           onClick={() => setMobileOpen(false)}
+                          title={collapsed ? item.name : undefined}
                           className={cn(
-                            "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group",
+                            "flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl transition-all duration-150 group text-xs",
                             isActive 
-                              ? "bg-gradient-to-r from-[#1e3a5f] to-[#2d4a6f] text-white shadow-lg shadow-slate-900/10" 
-                              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                              ? section.activeBg 
+                              : section.hoverBg
                           )}
                         >
-                          <item.icon className={cn(
-                            "h-5 w-5 flex-shrink-0 transition-transform",
-                            !isActive && "group-hover:scale-110"
-                          )} />
+                          <div className={cn(
+                            "p-1 rounded-lg transition-colors flex items-center justify-center shrink-0",
+                            isActive 
+                              ? "bg-white/20 text-white" 
+                              : cn("group-hover:bg-white group-hover:shadow-2xs", section.iconDefault)
+                          )}>
+                            <item.icon className="h-3.5 w-3.5" />
+                          </div>
                           {!collapsed && (
-                            <span className="font-medium text-sm">{item.name}</span>
+                            <span className="truncate font-medium">{item.name}</span>
                           )}
                         </Link>
                       );

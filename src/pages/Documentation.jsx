@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import PageHeader from '../components/common/PageHeader';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { 
   BookOpen, 
   Search, 
@@ -844,42 +847,66 @@ export default function Documentation() {
   const activeContent = sections.find(s => s.id === activeSection);
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <PageHeader
-        title="Documentation Sadesk"
-        subtitle="Guide complet d'utilisation de l'application"
-      />
+    <div className="max-w-7xl mx-auto space-y-6 pb-16">
+      {/* En-tête Rose / Référentiel */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-2 border-b border-slate-200/80">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
+              Documentation & Référentiels
+            </h1>
+            <Badge variant="outline" className="font-mono text-xs px-2.5 py-1 bg-rose-50 text-rose-800 border-rose-300">
+              Guide & Normes
+            </Badge>
+          </div>
+          <p className="text-slate-500 mt-1 text-sm lg:text-base">
+            Manuel d'utilisation, nomenclature PCG / SYSCOHADA et principes comptables
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <Link to={createPageUrl('Accounts')}>
+            <Button variant="outline" className="gap-2 text-xs bg-white border-slate-200">
+              <BookOpen className="h-4 w-4 text-rose-600" />
+              Consulter le plan comptable
+            </Button>
+          </Link>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sidebar navigation */}
         <div className="lg:col-span-1">
-          <Card className="sticky top-6">
-            <CardHeader>
+          <Card className="sticky top-6 rounded-2xl border-slate-200/90 shadow-xs overflow-hidden">
+            <CardHeader className="bg-slate-50/70 border-b border-slate-100 p-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   placeholder="Rechercher..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-9 bg-white border-slate-200 rounded-xl text-xs"
                 />
               </div>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-2">
               <nav className="space-y-1">
                 {filteredSections.map((section) => (
                   <button
                     key={section.id}
                     onClick={() => setActiveSection(section.id)}
                     className={cn(
-                      "w-full text-left px-4 py-3 flex items-center gap-3 transition-colors text-sm",
+                      "w-full text-left px-3.5 py-2.5 rounded-xl flex items-center gap-2.5 transition-all text-xs font-medium",
                       activeSection === section.id
-                        ? "bg-blue-50 text-blue-700 border-l-4 border-blue-600"
-                        : "text-slate-600 hover:bg-slate-50 border-l-4 border-transparent"
+                        ? "bg-rose-50 text-rose-800 font-bold shadow-2xs border border-rose-200"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                     )}
                   >
-                    <section.icon className="h-4 w-4 flex-shrink-0" />
-                    <span className="line-clamp-2">{section.title}</span>
+                    <section.icon className={cn(
+                      "h-4 w-4 shrink-0",
+                      activeSection === section.id ? "text-rose-600" : "text-slate-400"
+                    )} />
+                    <span className="truncate">{section.title}</span>
                   </button>
                 ))}
               </nav>
@@ -890,105 +917,23 @@ export default function Documentation() {
         {/* Content */}
         <div className="lg:col-span-3">
           {activeContent && (
-            <Card>
-              <CardHeader className="border-b">
-                <div className="flex items-start gap-4">
-                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0">
-                    <activeContent.icon className="h-6 w-6 text-white" />
+            <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden bg-white">
+              <CardHeader className="bg-slate-50/70 border-b border-slate-100 p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-rose-100 text-rose-700 rounded-2xl shadow-2xs">
+                    <activeContent.icon className="h-6 w-6" />
                   </div>
                   <div>
-                    <CardTitle className="text-2xl text-slate-800">
+                    <CardTitle className="text-xl font-bold text-slate-900">
                       {activeContent.title}
                     </CardTitle>
+                    <p className="text-xs text-slate-500 mt-0.5">Guide de référence Sadesk</p>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-8">
-                <div className="prose prose-slate max-w-none">
-                  {activeContent.content.split('\n').map((line, idx) => {
-                    // Headers
-                    if (line.startsWith('### ')) {
-                      return (
-                        <h3 key={idx} className="text-xl font-semibold text-slate-800 mt-6 mb-3">
-                          {line.replace('### ', '')}
-                        </h3>
-                      );
-                    }
-                    if (line.startsWith('## ')) {
-                      return (
-                        <h2 key={idx} className="text-2xl font-bold text-slate-800 mt-8 mb-4">
-                          {line.replace('## ', '')}
-                        </h2>
-                      );
-                    }
-
-                    // Bold
-                    if (line.startsWith('**') && line.endsWith('**')) {
-                      return (
-                        <p key={idx} className="font-semibold text-slate-800 mt-4 mb-2">
-                          {line.replace(/\*\*/g, '')}
-                        </p>
-                      );
-                    }
-
-                    // Lists
-                    if (line.startsWith('- ')) {
-                      return (
-                        <li key={idx} className="text-slate-700 ml-6 my-1">
-                          {line.replace('- ', '').replace(/\*\*/g, '')}
-                        </li>
-                      );
-                    }
-
-                    // Code blocks
-                    if (line.startsWith('```')) {
-                      return null;
-                    }
-                    if (line.trim().startsWith('{') || line.trim().startsWith('analytical_distribution:')) {
-                      return (
-                        <pre key={idx} className="bg-slate-900 text-slate-100 p-3 rounded-lg text-sm my-2 overflow-x-auto">
-                          <code>{line}</code>
-                        </pre>
-                      );
-                    }
-
-                    // Checkmarks and warnings
-                    if (line.startsWith('✓')) {
-                      return (
-                        <div key={idx} className="flex items-start gap-2 my-2">
-                          <CheckCircle className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
-                          <span className="text-slate-700">{line.replace('✓ ', '')}</span>
-                        </div>
-                      );
-                    }
-                    if (line.startsWith('⚠️')) {
-                      return (
-                        <div key={idx} className="flex items-start gap-2 my-2">
-                          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                          <span className="text-slate-700">{line.replace('⚠️ ', '')}</span>
-                        </div>
-                      );
-                    }
-                    if (line.startsWith('✗')) {
-                      return (
-                        <div key={idx} className="flex items-start gap-2 my-2">
-                          <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-                          <span className="text-slate-700">{line.replace('✗ ', '')}</span>
-                        </div>
-                      );
-                    }
-
-                    // Regular paragraphs
-                    if (line.trim()) {
-                      return (
-                        <p key={idx} className="text-slate-700 my-2 leading-relaxed">
-                          {line}
-                        </p>
-                      );
-                    }
-
-                    return <br key={idx} />;
-                  })}
+              <CardContent className="p-6">
+                <div className="prose prose-slate max-w-none text-slate-700 text-sm leading-relaxed">
+                  <div className="whitespace-pre-wrap">{activeContent.content}</div>
                 </div>
               </CardContent>
             </Card>

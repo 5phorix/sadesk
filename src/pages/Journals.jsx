@@ -2,10 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { useYearEntries } from '@/components/hooks/useManagement';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import PageHeader from '@/components/common/PageHeader';
-import AmountDisplay from '@/components/common/AmountDisplay';
 import { JOURNALS, groupByJournal, groupByVoucher, journalLabel } from '@/lib/accounting';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -17,14 +16,24 @@ import {
 import { format, parseISO } from 'date-fns';
 import { AlertTriangle, BookOpen, Download } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 const MONTHS = [
-  { value: 'all', label: 'Tout l\u2019exercice' },
+  { value: 'all', label: 'Tout l’exercice' },
   ...Array.from({ length: 12 }, (_, index) => ({
     value: String(index + 1),
     label: new Date(2024, index, 1).toLocaleDateString('fr-FR', { month: 'long' }),
   })),
 ];
+
+const JOURNAL_PALETTE = {
+  'AC': { badge: 'bg-amber-100 text-amber-900 border-amber-300', dot: 'bg-amber-500', bar: 'border-l-amber-500' },
+  'VE': { badge: 'bg-blue-100 text-blue-900 border-blue-300', dot: 'bg-blue-500', bar: 'border-l-blue-500' },
+  'BQ': { badge: 'bg-emerald-100 text-emerald-900 border-emerald-300', dot: 'bg-emerald-500', bar: 'border-l-emerald-500' },
+  'CA': { badge: 'bg-cyan-100 text-cyan-900 border-cyan-300', dot: 'bg-cyan-500', bar: 'border-l-cyan-500' },
+  'OD': { badge: 'bg-purple-100 text-purple-900 border-purple-300', dot: 'bg-purple-500', bar: 'border-l-purple-500' },
+  'AN': { badge: 'bg-slate-100 text-slate-900 border-slate-300', dot: 'bg-slate-500', bar: 'border-l-slate-500' }
+};
 
 const euro = (value) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value || 0);
@@ -100,14 +109,14 @@ export default function Journals() {
 
   return (
     <ProtectedRoute>
-      <div>
+      <div className="space-y-6 pb-16">
         <PageHeader
           title="Journaux comptables"
           subtitle="Détail des écritures par journal et par pièce"
           actions={
-            <>
+            <div className="flex flex-wrap items-center gap-2.5">
               <Select value={journalCode} onValueChange={setJournalCode}>
-                <SelectTrigger className="w-44">
+                <SelectTrigger className="w-44 bg-white border-slate-200 rounded-xl text-xs h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -121,7 +130,7 @@ export default function Journals() {
               </Select>
 
               <Select value={month} onValueChange={setMonth}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-40 bg-white border-slate-200 rounded-xl text-xs h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -134,7 +143,7 @@ export default function Journals() {
               </Select>
 
               <Select value={String(year)} onValueChange={(value) => setYear(Number(value))}>
-                <SelectTrigger className="w-28">
+                <SelectTrigger className="w-28 bg-white border-slate-200 rounded-xl text-xs h-10 font-bold">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -146,32 +155,32 @@ export default function Journals() {
                 </SelectContent>
               </Select>
 
-              <Button variant="outline" onClick={handleExport}>
-                <Download className="mr-2 h-4 w-4" />
-                Exporter
+              <Button variant="outline" onClick={handleExport} className="gap-2 rounded-xl text-xs h-10 bg-white">
+                <Download className="h-4 w-4 text-slate-500" />
+                Exporter CSV
               </Button>
-            </>
+            </div>
           }
         />
 
         <div className="grid gap-4 sm:grid-cols-3">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-slate-500">Total débit</p>
-              <p className="mt-1 text-2xl font-bold">{euro(totals.debit)}</p>
+          <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white">
+            <CardContent className="pt-5">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total débit</span>
+              <p className="mt-1 text-2xl font-bold font-mono text-slate-900">{euro(totals.debit)}</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-slate-500">Total crédit</p>
-              <p className="mt-1 text-2xl font-bold">{euro(totals.credit)}</p>
+          <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white">
+            <CardContent className="pt-5">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total crédit</span>
+              <p className="mt-1 text-2xl font-bold font-mono text-slate-900">{euro(totals.credit)}</p>
             </CardContent>
           </Card>
-          <Card className={Math.abs(totals.balance) < 0.01 ? '' : 'border-red-300'}>
-            <CardContent className="pt-6">
-              <p className="text-sm text-slate-500">Équilibre</p>
+          <Card className={cn("rounded-2xl border shadow-xs", Math.abs(totals.balance) < 0.01 ? 'bg-emerald-50/50 border-emerald-200' : 'bg-rose-50/50 border-rose-200')}>
+            <CardContent className="pt-5">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Équilibre</span>
               <p
-                className={`mt-1 text-2xl font-bold ${Math.abs(totals.balance) < 0.01 ? 'text-emerald-600' : 'text-red-600'}`}
+                className={cn("mt-1 text-2xl font-bold font-mono", Math.abs(totals.balance) < 0.01 ? 'text-emerald-700' : 'text-rose-700')}
               >
                 {euro(totals.balance)}
               </p>
@@ -180,11 +189,11 @@ export default function Journals() {
         </div>
 
         {totals.unbalanced.length > 0 && (
-          <Card className="mt-6 border-red-200 bg-red-50/50">
-            <CardContent className="flex items-start gap-3 pt-6">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
-              <div className="text-sm text-red-900">
-                <p className="font-semibold">
+          <Card className="border-rose-200 bg-rose-50/70 rounded-2xl shadow-xs">
+            <CardContent className="flex items-start gap-3 p-4">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+              <div className="text-xs text-rose-900">
+                <p className="font-bold">
                   {totals.unbalanced.length} journal/journaux déséquilibré(s)
                 </p>
                 <p className="mt-1">
@@ -197,78 +206,111 @@ export default function Journals() {
           </Card>
         )}
 
-        <div className="mt-6 space-y-4">
+        <div className="space-y-4">
           {isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
 
           {!isLoading && journals.length === 0 && (
-            <Card>
-              <CardContent className="py-12 text-center text-slate-500">
-                <BookOpen className="mx-auto mb-3 h-10 w-10 text-slate-300" />
-                Aucune écriture sur ce périmètre.
-              </CardContent>
+            <Card className="rounded-3xl border-slate-200 p-12 text-center text-slate-500">
+              <BookOpen className="mx-auto mb-3 h-12 w-12 text-slate-300" />
+              <h3 className="font-semibold text-slate-800">Aucune écriture sur ce périmètre</h3>
+              <p className="text-xs text-slate-400 mt-1">Sélectionnez un autre mois ou saisissez de nouvelles écritures.</p>
             </Card>
           )}
 
-          {journals.map((journal) => (
-            <Card key={journal.code}>
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-                  <Badge variant="outline">{journal.code}</Badge>
-                  {journalLabel(journal.code)}
-                  <span className="text-sm font-normal text-slate-500">
-                    {journal.count} ligne(s) · Débit {euro(journal.debit)} · Crédit{' '}
-                    {euro(journal.credit)}
-                  </span>
-                  {!journal.isBalanced && (
-                    <Badge className="bg-red-100 text-red-800">
-                      Déséquilibre {euro(journal.balance)}
-                    </Badge>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="overflow-x-auto">
-                {groupByVoucher(journal.entries).map((voucher) => (
-                  <div key={voucher.entryNumber || voucher.lines[0].id} className="mb-4 last:mb-0">
-                    <div className="mb-1 flex items-center gap-2 text-sm">
-                      <span className="font-medium text-slate-900">
-                        {voucher.entryNumber || 'Sans numéro de pièce'}
-                      </span>
-                      <span className="text-slate-500">
-                        {format(parseISO(voucher.date), 'dd/MM/yyyy')}
-                      </span>
-                      {!voucher.isBalanced && (
-                        <Badge className="bg-red-100 text-red-800">Déséquilibrée</Badge>
+          {journals.map((journal) => {
+            const pal = JOURNAL_PALETTE[journal.code] || { badge: 'bg-slate-100 text-slate-900', dot: 'bg-slate-500', bar: 'border-l-slate-400' };
+            return (
+              <Card key={journal.code} className={cn("rounded-2xl border-slate-200/90 shadow-xs overflow-hidden border-l-4", pal.bar)}>
+                <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 py-3.5 px-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline" className={cn("text-xs font-mono font-bold px-2.5 py-0.5", pal.badge)}>
+                        <span className={cn("w-1.5 h-1.5 rounded-full mr-1.5", pal.dot)} />
+                        Journal {journal.code}
+                      </Badge>
+                      <h3 className="font-bold text-slate-900 text-base">{journalLabel(journal.code)}</h3>
+                    </div>
+                    <div className="flex items-center gap-2.5 text-xs font-mono">
+                      <span className="text-slate-500">{journal.count} ligne(s)</span>
+                      <span className="text-slate-700 font-semibold">• D: {euro(journal.debit)}</span>
+                      <span className="text-slate-700 font-semibold">• C: {euro(journal.credit)}</span>
+                      {journal.isBalanced ? (
+                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">
+                          Équilibré ✓
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-rose-100 text-rose-800 text-[10px]">
+                          Déséquilibre {euro(journal.balance)}
+                        </Badge>
                       )}
                     </div>
-                    <table className="w-full text-sm">
-                      <tbody>
-                        {voucher.lines.map((line) => (
-                          <tr key={line.id} className="border-b last:border-0">
-                            <td className="w-24 py-1 text-slate-600">{line.account_code}</td>
-                            <td className="py-1 text-slate-600">{line.account_label}</td>
-                            <td className="py-1">{line.label}</td>
-                            <td className="w-16 py-1">
-                              {line.lettering && (
-                                <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                                  {line.lettering}
-                                </Badge>
-                              )}
-                            </td>
-                            <td className="w-28 py-1 text-right">
-                              {Number(line.debit) > 0 ? <AmountDisplay amount={line.debit} /> : ''}
-                            </td>
-                            <td className="w-28 py-1 text-right">
-                              {Number(line.credit) > 0 ? <AmountDisplay amount={line.credit} /> : ''}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          ))}
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                  {groupByVoucher(journal.entries).map((voucher) => (
+                    <div key={voucher.entryNumber || voucher.lines[0].id} className="rounded-xl border border-slate-200/70 bg-white overflow-hidden shadow-2xs">
+                      <div className="px-3.5 py-2 bg-slate-50/70 border-b border-slate-200/60 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-slate-800">
+                            Pièce : {voucher.entryNumber || 'Sans N°'}
+                          </span>
+                          <span className="text-slate-400">•</span>
+                          <span className="text-slate-600 font-mono">
+                            {format(parseISO(voucher.date), 'dd/MM/yyyy')}
+                          </span>
+                        </div>
+                        <div>
+                          {!voucher.isBalanced && (
+                            <Badge className="bg-rose-100 text-rose-800 text-[10px]">Déséquilibrée</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left">
+                          <thead>
+                            <tr className="bg-slate-100/40 text-slate-500 border-b border-slate-100 text-[11px]">
+                              <th className="py-2 px-3 w-28">N° Compte</th>
+                              <th className="py-2 px-3">Intitulé</th>
+                              <th className="py-2 px-3">Libellé</th>
+                              <th className="py-2 px-2 text-center w-20">Lettrage</th>
+                              <th className="py-2 px-3 text-right w-28">Débit</th>
+                              <th className="py-2 px-3 text-right w-28">Crédit</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {voucher.lines.map((line) => (
+                              <tr key={line.id} className="hover:bg-slate-50/70 transition-colors">
+                                <td className="py-2 px-3 font-mono font-bold text-slate-800">
+                                  {line.account_code}
+                                </td>
+                                <td className="py-2 px-3 font-medium text-slate-700">{line.account_label}</td>
+                                <td className="py-2 px-3 text-slate-600">{line.label}</td>
+                                <td className="py-2 px-2 text-center font-mono">
+                                  {line.lettering ? (
+                                    <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-700 border-indigo-200">
+                                      {line.lettering}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-slate-300">-</span>
+                                  )}
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900">
+                                  {Number(line.debit) > 0 ? `${Number(line.debit).toFixed(2)} €` : '-'}
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900">
+                                  {Number(line.credit) > 0 ? `${Number(line.credit).toFixed(2)} €` : '-'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
     </ProtectedRoute>

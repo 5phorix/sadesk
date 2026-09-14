@@ -21,6 +21,7 @@ import {
 import { toast } from 'sonner';
 import { format, startOfYear, endOfYear, startOfMonth, endOfMonth } from 'date-fns';
 import AmountDisplay from '@/components/common/AmountDisplay';
+import { cn } from '@/lib/utils';
 
 export default function Reports() {
   const { user } = useUser();
@@ -64,7 +65,7 @@ export default function Reports() {
     });
   };
 
-  // Calcul Balance Générale
+  // Calcul Balance Générale (6 colonnes réglementaires)
   const calculateBalance = () => {
     const filtered = filterEntriesByPeriod();
     const accounts = {};
@@ -73,7 +74,7 @@ export default function Reports() {
       if (!accounts[entry.account_code]) {
         accounts[entry.account_code] = {
           code: entry.account_code,
-          label: entry.account_label,
+          label: entry.account_label || `Compte ${entry.account_code}`,
           debit: 0,
           credit: 0
         };
@@ -82,10 +83,15 @@ export default function Reports() {
       accounts[entry.account_code].credit += parseFloat(entry.credit) || 0;
     });
 
-    return Object.values(accounts).map(acc => ({
-      ...acc,
-      balance: acc.debit - acc.credit
-    })).sort((a, b) => a.code.localeCompare(b.code));
+    return Object.values(accounts).map(acc => {
+      const solde = acc.debit - acc.credit;
+      return {
+        ...acc,
+        balance: solde,
+        soldeDebiteur: solde > 0 ? solde : 0,
+        soldeCrediteur: solde < 0 ? Math.abs(solde) : 0
+      };
+    }).sort((a, b) => a.code.localeCompare(b.code));
   };
 
   // Calcul Compte de Résultat
@@ -162,7 +168,7 @@ export default function Reports() {
     };
   };
 
-  // Grand Livre
+  // Grand Livre avec soldes progressifs et cumulés
   const generateLedger = () => {
     const filtered = filterEntriesByPeriod();
     const ledger = {};
@@ -171,14 +177,47 @@ export default function Reports() {
       if (!ledger[entry.account_code]) {
         ledger[entry.account_code] = {
           code: entry.account_code,
-          label: entry.account_label,
-          entries: []
+          label: entry.account_label || `Compte ${entry.account_code}`,
+          entries: [],
+          totalDebit: 0,
+          totalCredit: 0
         };
       }
+      const d = parseFloat(entry.debit) || 0;
+      const c = parseFloat(entry.credit) || 0;
       ledger[entry.account_code].entries.push(entry);
+      ledger[entry.account_code].totalDebit += d;
+      ledger[entry.account_code].totalCredit += c;
     });
 
-    return Object.values(ledger).sort((a, b) => a.code.localeCompare(b.code));
+    return Object.values(ledger)
+      .map(acc => {
+        let runningBalance = 0;
+        const sortedEntries = [...acc.entries]
+          .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+          .map(e => {
+            const d = parseFloat(e.debit) || 0;
+            const c = parseFloat(e.credit) || 0;
+            runningBalance += (d - c);
+            return {
+              ...e,
+              debitNum: d,
+              creditNum: c,
+              runningBalance
+            };
+          });
+
+        const soldeFinal = acc.totalDebit - acc.totalCredit;
+
+        return {
+          ...acc,
+          entries: sortedEntries,
+          soldeFinal,
+          soldeDebiteur: soldeFinal > 0 ? soldeFinal : 0,
+          soldeCrediteur: soldeFinal < 0 ? Math.abs(soldeFinal) : 0
+        };
+      })
+      .sort((a, b) => a.code.localeCompare(b.code));
   };
 
   // Analyse IA
@@ -246,43 +285,59 @@ Format: Markdown avec structure claire.`;
       id: 'balance',
       name: 'Balance Générale',
       icon: Scale,
-      description: 'Vue d\'ensemble des soldes de tous les comptes'
+      color: 'from-blue-600 to-indigo-700',
+      activeBorder: 'border-blue-500 bg-blue-50/40',
+      iconBg: 'bg-blue-100 text-blue-700',
+      description: 'Vue d’ensemble des soldes Débiteur/Créditeur de tous les comptes'
     },
     {
       id: 'profit_loss',
       name: 'Compte de Résultat',
       icon: TrendingUp,
-      description: 'Produits et charges de la période'
+      color: 'from-teal-600 to-emerald-700',
+      activeBorder: 'border-teal-500 bg-teal-50/40',
+      iconBg: 'bg-teal-100 text-teal-700',
+      description: 'Produits et charges de la période avec résultat net'
     },
     {
       id: 'balance_sheet',
-      name: 'Bilan',
+      name: 'Bilan Synthétique',
       icon: BarChart3,
-      description: 'Actif et passif à la date de clôture'
+      color: 'from-purple-600 to-pink-700',
+      activeBorder: 'border-purple-500 bg-purple-50/40',
+      iconBg: 'bg-purple-100 text-purple-700',
+      description: 'Actif et passif à la date de clôture de l’exercice'
     },
     {
       id: 'cash_flow',
       name: 'Flux de Trésorerie',
       icon: DollarSign,
-      description: 'Mouvements de trésorerie par catégorie'
+      color: 'from-emerald-600 to-green-700',
+      activeBorder: 'border-emerald-500 bg-emerald-50/40',
+      iconBg: 'bg-emerald-100 text-emerald-700',
+      description: 'Mouvements de trésorerie par catégorie d’activité'
     },
     {
       id: 'ledger',
       name: 'Grand Livre',
       icon: BookOpen,
-      description: 'Détail des écritures par compte'
+      color: 'from-amber-600 to-orange-700',
+      activeBorder: 'border-amber-500 bg-amber-50/40',
+      iconBg: 'bg-amber-100 text-amber-700',
+      description: 'Détail chronologique et solde progressif par compte'
     }
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-16">
       <PageHeader
-        title="Rapports Financiers"
-        subtitle="Générez et analysez vos rapports comptables"
+        title="Rapports Financiers & Documents"
+        subtitle="Générez, analysez et exportez vos états comptables officiels"
+        badge="Nomenclature normalisée"
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-44 bg-white border-slate-200 rounded-xl text-xs h-10 font-medium">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -294,10 +349,10 @@ Format: Markdown avec structure claire.`;
             <Button
               onClick={handleAIAnalysis}
               disabled={aiAnalysisLoading}
-              className="gap-2 bg-gradient-to-r from-purple-600 to-indigo-600"
+              className="gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm hover:from-purple-700 hover:to-indigo-700 rounded-xl text-xs h-10 font-semibold"
             >
               <Sparkles className="h-4 w-4" />
-              {aiAnalysisLoading ? 'Analyse...' : 'Analyse IA'}
+              {aiAnalysisLoading ? 'Analyse en cours...' : 'Analyse IA Expert'}
             </Button>
           </div>
         }
@@ -305,109 +360,124 @@ Format: Markdown avec structure claire.`;
 
       {/* Analyse IA */}
       {aiInsight && (
-        <Card className="border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-purple-600" />
+        <Card className="rounded-3xl border-2 border-purple-200/90 bg-gradient-to-r from-purple-50/60 via-indigo-50/40 to-white shadow-xs overflow-hidden">
+          <CardHeader className="p-5 pb-3">
+            <CardTitle className="flex items-center gap-2.5 text-base font-bold text-purple-950">
+              <div className="p-1.5 rounded-xl bg-purple-600 text-white shadow-xs">
+                <Sparkles className="h-4 w-4" />
+              </div>
               Analyse IA de votre situation financière
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="prose prose-sm max-w-none">
-              <div className="whitespace-pre-wrap text-slate-700">{aiInsight}</div>
+          <CardContent className="p-5 pt-0">
+            <div className="prose prose-sm max-w-none text-slate-700 bg-white/80 p-4 rounded-2xl border border-purple-100 shadow-2xs">
+              <div className="whitespace-pre-wrap leading-relaxed">{aiInsight}</div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Sélection des rapports */}
-      <div className="grid md:grid-cols-5 gap-4">
+      {/* Sélection des rapports en cartes modernes */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
         {reports.map(report => {
           const Icon = report.icon;
+          const isSelected = activeReport === report.id;
           return (
-            <Card
+            <div
               key={report.id}
-              className={`cursor-pointer transition-all hover:shadow-lg ${
-                activeReport === report.id
-                  ? 'border-2 border-[#1e3a5f] bg-slate-50'
-                  : 'hover:border-slate-300'
-              }`}
               onClick={() => setActiveReport(report.id)}
+              className={cn(
+                "cursor-pointer rounded-2xl border p-4 transition-all duration-200 flex flex-col justify-between shadow-2xs hover:-translate-y-0.5",
+                isSelected
+                  ? cn("border-2 shadow-sm", report.activeBorder)
+                  : "bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/50"
+              )}
             >
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center text-center gap-3">
-                  <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${
-                    activeReport === report.id
-                      ? 'bg-gradient-to-br from-[#1e3a5f] to-[#2d4a6f]'
-                      : 'bg-slate-100'
-                  }`}>
-                    <Icon className={`h-6 w-6 ${
-                      activeReport === report.id ? 'text-white' : 'text-slate-600'
-                    }`} />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm">{report.name}</p>
-                    <p className="text-xs text-slate-500 mt-1">{report.description}</p>
-                  </div>
+              <div className="flex items-center justify-between mb-3">
+                <div className={cn("p-2.5 rounded-xl flex items-center justify-center transition-colors", isSelected ? cn("bg-gradient-to-br text-white shadow-sm", report.color) : report.iconBg)}>
+                  <Icon className="h-4 w-4" />
                 </div>
-              </CardContent>
-            </Card>
+                {isSelected && (
+                  <Badge variant="outline" className="text-[10px] font-bold px-1.5 py-0 bg-white border-slate-300">
+                    Actif
+                  </Badge>
+                )}
+              </div>
+              <div>
+                <p className="font-bold text-slate-900 text-xs sm:text-sm">{report.name}</p>
+                <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 leading-tight">{report.description}</p>
+              </div>
+            </div>
           );
         })}
       </div>
 
       {/* Contenu des rapports */}
       {activeReport === 'balance' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Balance Générale</CardTitle>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Exporter
+        <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
+          <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg font-bold text-slate-900">Balance Générale des Comptes</CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">Présentation officielle normalisée (Mouvements et Soldes)</p>
+              </div>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" />
+                Exporter CSV
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-2 text-sm font-semibold text-slate-600">Compte</th>
-                    <th className="text-left py-3 px-2 text-sm font-semibold text-slate-600">Libellé</th>
-                    <th className="text-right py-3 px-2 text-sm font-semibold text-slate-600">Débit</th>
-                    <th className="text-right py-3 px-2 text-sm font-semibold text-slate-600">Crédit</th>
-                    <th className="text-right py-3 px-2 text-sm font-semibold text-slate-600">Solde</th>
+                  <tr className="bg-slate-100/90 text-slate-700 font-bold uppercase border-b border-slate-200">
+                    <th className="py-3 px-4 w-28">N° Compte</th>
+                    <th className="py-3 px-4">Intitulé du compte</th>
+                    <th className="py-3 px-4 text-right w-36 bg-blue-50/40 text-blue-900">Total Débit</th>
+                    <th className="py-3 px-4 text-right w-36 bg-blue-50/40 text-blue-900">Total Crédit</th>
+                    <th className="py-3 px-4 text-right w-36 bg-slate-50 text-slate-900 font-bold">Solde Débiteur</th>
+                    <th className="py-3 px-4 text-right w-36 bg-slate-50 text-slate-900 font-bold">Solde Créditeur</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100">
                   {balance.map(acc => (
-                    <tr key={acc.code} className="border-b hover:bg-slate-50">
-                      <td className="py-2 px-2 text-sm font-medium">{acc.code}</td>
-                      <td className="py-2 px-2 text-sm">{acc.label}</td>
-                      <td className="py-2 px-2 text-sm text-right">
-                        <AmountDisplay amount={acc.debit} size="sm" />
+                    <tr key={acc.code} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-2.5 px-4 font-mono font-bold text-slate-900">
+                        <span className="px-2 py-0.5 bg-slate-100 rounded-md border border-slate-200/80">
+                          {acc.code}
+                        </span>
                       </td>
-                      <td className="py-2 px-2 text-sm text-right">
-                        <AmountDisplay amount={acc.credit} size="sm" />
+                      <td className="py-2.5 px-4 font-medium text-slate-800">{acc.label}</td>
+                      <td className="py-2.5 px-4 text-right font-mono bg-blue-50/10 text-slate-800">
+                        {acc.debit > 0 ? `${acc.debit.toFixed(2)} €` : '-'}
                       </td>
-                      <td className="py-2 px-2 text-sm text-right font-semibold">
-                        <AmountDisplay amount={acc.balance} size="sm" showSign />
+                      <td className="py-2.5 px-4 text-right font-mono bg-blue-50/10 text-slate-800">
+                        {acc.credit > 0 ? `${acc.credit.toFixed(2)} €` : '-'}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700">
+                        {acc.soldeDebiteur > 0 ? `${acc.soldeDebiteur.toFixed(2)} €` : '-'}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono font-bold text-purple-700">
+                        {acc.soldeCrediteur > 0 ? `${acc.soldeCrediteur.toFixed(2)} €` : '-'}
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-slate-100 font-bold">
-                    <td colSpan={2} className="py-3 px-2 text-sm">TOTAL</td>
-                    <td className="py-3 px-2 text-sm text-right">
-                      <AmountDisplay amount={balance.reduce((sum, acc) => sum + acc.debit, 0)} size="sm" />
+                  <tr className="bg-slate-900 text-white font-bold text-xs">
+                    <td colSpan={2} className="py-3 px-4">TOTAUX GÉNÉRAUX</td>
+                    <td className="py-3 px-4 text-right font-mono font-bold">
+                      {balance.reduce((sum, acc) => sum + acc.debit, 0).toFixed(2)} €
                     </td>
-                    <td className="py-3 px-2 text-sm text-right">
-                      <AmountDisplay amount={balance.reduce((sum, acc) => sum + acc.credit, 0)} size="sm" />
+                    <td className="py-3 px-4 text-right font-mono font-bold">
+                      {balance.reduce((sum, acc) => sum + acc.credit, 0).toFixed(2)} €
                     </td>
-                    <td className="py-3 px-2 text-sm text-right">
-                      <AmountDisplay amount={balance.reduce((sum, acc) => sum + acc.balance, 0)} size="sm" showSign />
+                    <td className="py-3 px-4 text-right font-mono font-bold text-emerald-300">
+                      {balance.reduce((sum, acc) => sum + acc.soldeDebiteur, 0).toFixed(2)} €
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono font-bold text-purple-300">
+                      {balance.reduce((sum, acc) => sum + acc.soldeCrediteur, 0).toFixed(2)} €
                     </td>
                   </tr>
                 </tfoot>
@@ -418,116 +488,127 @@ Format: Markdown avec structure claire.`;
       )}
 
       {activeReport === 'profit_loss' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Compte de Résultat</CardTitle>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Exporter
+        <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
+          <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg font-bold text-slate-900">Compte de Résultat Synthétique</CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">Synthèse des charges et produits de la période sélectionnée</p>
+              </div>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" />
+                Exporter CSV
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 gap-8">
-              <div>
-                <h3 className="font-semibold text-red-600 mb-4 flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-red-600" />
-                  Charges
+          <CardContent className="p-5 sm:p-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+                <h3 className="font-bold text-rose-700 text-sm mb-3 flex items-center gap-2">
+                  <div className="h-2.5 w-2.5 rounded-full bg-rose-600" />
+                  Charges d'Exploitation & Générales (Cl. 6)
                 </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-slate-600">Total des charges</span>
-                    <AmountDisplay amount={profitLoss.charges} size="sm" className="font-semibold text-red-600" />
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-600">Total des charges décaissées</span>
+                    <AmountDisplay amount={profitLoss.charges} size="sm" className="font-bold font-mono text-rose-700" />
                   </div>
                 </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-green-600 mb-4 flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-green-600" />
-                  Produits
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+                <h3 className="font-bold text-emerald-700 text-sm mb-3 flex items-center gap-2">
+                  <div className="h-2.5 w-2.5 rounded-full bg-emerald-600" />
+                  Produits d'Exploitation & Ventes (Cl. 7)
                 </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-slate-600">Total des produits</span>
-                    <AmountDisplay amount={profitLoss.produits} size="sm" className="font-semibold text-green-600" />
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-600">Total des produits et ventes</span>
+                    <AmountDisplay amount={profitLoss.produits} size="sm" className="font-bold font-mono text-emerald-700" />
                   </div>
                 </div>
               </div>
             </div>
-            <div className="mt-8 pt-6 border-t-2 bg-slate-50 rounded-lg p-4">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-bold text-slate-900">Résultat Net</span>
-                <AmountDisplay 
-                  amount={profitLoss.resultat} 
-                  size="lg" 
-                  showSign 
-                  className="text-2xl font-bold"
-                />
+            <div className={cn(
+              "mt-6 rounded-2xl p-5 border flex items-center justify-between shadow-2xs",
+              profitLoss.resultat >= 0 ? "bg-emerald-50/70 border-emerald-200" : "bg-rose-50/70 border-rose-200"
+            )}>
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Solde Net</span>
+                <p className="text-lg font-bold text-slate-900">RÉSULTAT NET COMPTABLE</p>
               </div>
+              <AmountDisplay 
+                amount={profitLoss.resultat} 
+                size="xl" 
+                showSign 
+                className={cn("font-bold font-mono", profitLoss.resultat >= 0 ? "text-emerald-700" : "text-rose-700")}
+              />
             </div>
           </CardContent>
         </Card>
       )}
 
       {activeReport === 'balance_sheet' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Bilan</CardTitle>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Exporter
+        <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
+          <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg font-bold text-slate-900">Bilan Comptable Simplifié</CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">Photo patrimoniale de la société à la date de situation</p>
+              </div>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" />
+                Exporter CSV
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 gap-8">
-              <div>
-                <h3 className="font-semibold text-blue-600 mb-4 flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-blue-600" />
-                  ACTIF
+          <CardContent className="p-5 sm:p-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+                <h3 className="font-bold text-blue-700 text-sm mb-3 flex items-center gap-2">
+                  <div className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+                  ACTIF (Emplois)
                 </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-slate-600">Immobilisations</span>
-                    <AmountDisplay amount={balanceSheet.actif.immobilisations} size="sm" />
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-600">Immobilisations (Cl. 2)</span>
+                    <AmountDisplay amount={balanceSheet.actif.immobilisations} size="sm" className="font-mono font-medium" />
                   </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-slate-600">Stocks</span>
-                    <AmountDisplay amount={balanceSheet.actif.stocks} size="sm" />
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-600">Stocks (Cl. 3)</span>
+                    <AmountDisplay amount={balanceSheet.actif.stocks} size="sm" className="font-mono font-medium" />
                   </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-slate-600">Créances</span>
-                    <AmountDisplay amount={balanceSheet.actif.creances} size="sm" />
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-600">Créances clients (Cl. 4)</span>
+                    <AmountDisplay amount={balanceSheet.actif.creances} size="sm" className="font-mono font-medium" />
                   </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-slate-600">Trésorerie</span>
-                    <AmountDisplay amount={balanceSheet.actif.tresorerie} size="sm" />
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-600">Disponibilités & Trésorerie (Cl. 5)</span>
+                    <AmountDisplay amount={balanceSheet.actif.tresorerie} size="sm" className="font-mono font-medium" />
                   </div>
-                  <div className="flex justify-between py-3 bg-blue-50 rounded px-2 mt-4">
-                    <span className="font-bold">Total Actif</span>
-                    <AmountDisplay amount={balanceSheet.actif.total} size="sm" className="font-bold" />
+                  <div className="flex justify-between py-3 bg-blue-50/70 border border-blue-200 rounded-xl px-3 mt-4 text-blue-950 font-bold">
+                    <span>TOTAL ACTIF</span>
+                    <AmountDisplay amount={balanceSheet.actif.total} size="md" className="font-mono font-bold text-blue-900" />
                   </div>
                 </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-purple-600 mb-4 flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-purple-600" />
-                  PASSIF
+
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+                <h3 className="font-bold text-purple-700 text-sm mb-3 flex items-center gap-2">
+                  <div className="h-2.5 w-2.5 rounded-full bg-purple-600" />
+                  PASSIF (Ressources)
                 </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-slate-600">Capitaux propres</span>
-                    <AmountDisplay amount={balanceSheet.passif.capitaux} size="sm" />
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-600">Capitaux propres & Réserves (Cl. 1)</span>
+                    <AmountDisplay amount={balanceSheet.passif.capitaux} size="sm" className="font-mono font-medium" />
                   </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-slate-600">Dettes</span>
-                    <AmountDisplay amount={balanceSheet.passif.dettes} size="sm" />
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-600">Dettes fournisseurs & fiscales (Cl. 4/5)</span>
+                    <AmountDisplay amount={balanceSheet.passif.dettes} size="sm" className="font-mono font-medium" />
                   </div>
-                  <div className="flex justify-between py-3 bg-purple-50 rounded px-2 mt-4">
-                    <span className="font-bold">Total Passif</span>
-                    <AmountDisplay amount={balanceSheet.passif.total} size="sm" className="font-bold" />
+                  <div className="flex justify-between py-3 bg-purple-50/70 border border-purple-200 rounded-xl px-3 mt-4 text-purple-950 font-bold">
+                    <span>TOTAL PASSIF</span>
+                    <AmountDisplay amount={balanceSheet.passif.total} size="md" className="font-mono font-bold text-purple-900" />
                   </div>
                 </div>
               </div>
@@ -571,42 +652,118 @@ Format: Markdown avec structure claire.`;
       )}
 
       {activeReport === 'ledger' && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex items-center justify-between shadow-xs">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Grand Livre Général des Comptes</h3>
+              <p className="text-xs text-slate-500">Mouvements chronologiques et soldes progressifs par compte</p>
+            </div>
+            <Badge variant="outline" className="font-mono text-xs bg-slate-100 text-slate-700">
+              {ledger.length} compte(s) mouvementé(s)
+            </Badge>
+          </div>
+
           {ledger.map(account => (
-            <Card key={account.code}>
-              <CardHeader>
-                <CardTitle className="text-base">
-                  {account.code} - {account.label}
-                  <Badge variant="secondary" className="ml-3">{account.entries.length} écriture(s)</Badge>
-                </CardTitle>
+            <Card key={account.code} className="rounded-2xl border-slate-200/90 shadow-xs overflow-hidden">
+              <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 py-3.5 px-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-bold text-sm px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-slate-900 shadow-2xs">
+                      {account.code}
+                    </span>
+                    <h4 className="font-semibold text-slate-800 text-sm">{account.label}</h4>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs font-mono">
+                      {account.entries.length} écriture(s)
+                    </Badge>
+                    <Badge 
+                      variant="outline"
+                      className={cn(
+                        "text-xs font-mono font-bold",
+                        account.soldeFinal >= 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-purple-50 text-purple-700 border-purple-200"
+                      )}
+                    >
+                      Solde : {account.soldeFinal.toFixed(2)} € {account.soldeFinal >= 0 ? '(D)' : '(C)'}
+                    </Badge>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2 px-2 text-slate-600">Date</th>
-                        <th className="text-left py-2 px-2 text-slate-600">Journal</th>
-                        <th className="text-left py-2 px-2 text-slate-600">Libellé</th>
-                        <th className="text-right py-2 px-2 text-slate-600">Débit</th>
-                        <th className="text-right py-2 px-2 text-slate-600">Crédit</th>
+                      <tr className="bg-slate-100/60 text-slate-600 font-bold uppercase border-b border-slate-200">
+                        <th className="py-2.5 px-4 w-28">Date</th>
+                        <th className="py-2.5 px-3 w-20">Journal</th>
+                        <th className="py-2.5 px-3 w-24">N° Pièce</th>
+                        <th className="py-2.5 px-4">Libellé de l'opération</th>
+                        <th className="py-2.5 px-4 text-right w-32">Débit</th>
+                        <th className="py-2.5 px-4 text-right w-32">Crédit</th>
+                        <th className="py-2.5 px-4 text-right w-32 font-bold bg-slate-50">Solde progressif</th>
+                        <th className="py-2.5 px-3 text-center w-20">Lettrage</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-slate-100">
                       {account.entries.map(entry => (
-                        <tr key={entry.id} className="border-b hover:bg-slate-50">
-                          <td className="py-2 px-2">{format(new Date(entry.date), 'dd/MM/yyyy')}</td>
-                          <td className="py-2 px-2">{entry.journal}</td>
-                          <td className="py-2 px-2">{entry.label}</td>
-                          <td className="py-2 px-2 text-right">
-                            {entry.debit > 0 && <AmountDisplay amount={entry.debit} size="sm" />}
+                        <tr key={entry.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-2 px-4 font-mono text-slate-600">
+                            {format(new Date(entry.date), 'dd/MM/yyyy')}
                           </td>
-                          <td className="py-2 px-2 text-right">
-                            {entry.credit > 0 && <AmountDisplay amount={entry.credit} size="sm" />}
+                          <td className="py-2 px-3">
+                            <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 bg-slate-100">
+                              {entry.journal || 'OD'}
+                            </Badge>
+                          </td>
+                          <td className="py-2 px-3 font-mono text-slate-500">
+                            {entry.entry_number || '-'}
+                          </td>
+                          <td className="py-2 px-4 font-medium text-slate-800">
+                            {entry.label}
+                            {entry.reference && (
+                              <span className="text-slate-400 text-[11px] ml-1.5">
+                                (Réf: {entry.reference})
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono text-slate-800">
+                            {entry.debitNum > 0 ? `${entry.debitNum.toFixed(2)} €` : '-'}
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono text-slate-800">
+                            {entry.creditNum > 0 ? `${entry.creditNum.toFixed(2)} €` : '-'}
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono font-semibold bg-slate-50/60 text-slate-900">
+                            {entry.runningBalance.toFixed(2)} €
+                          </td>
+                          <td className="py-2 px-3 text-center font-mono">
+                            {entry.lettering ? (
+                              <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-700 border-indigo-200">
+                                {entry.lettering}
+                              </Badge>
+                            ) : (
+                              <span className="text-slate-300">-</span>
+                            )}
                           </td>
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-50 border-t border-slate-200 font-bold text-xs">
+                        <td colSpan={4} className="py-2.5 px-4 text-slate-700 uppercase">
+                          Totaux compte {account.code}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-slate-900">
+                          {account.totalDebit.toFixed(2)} €
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-slate-900">
+                          {account.totalCredit.toFixed(2)} €
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-slate-900 bg-slate-100/70">
+                          {account.soldeFinal.toFixed(2)} €
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </CardContent>

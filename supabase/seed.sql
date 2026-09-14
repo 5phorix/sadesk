@@ -111,6 +111,17 @@ set active_company_id = '00000000-0000-0000-0000-000000000010',
     display_name = 'Utilisateur Demo'
 where id = '00000000-0000-0000-0000-000000000001';
 
+insert into public.accounts (
+  company_id, code, label, class, parent_code, type, category,
+  is_auxiliary, is_active, plan_code, review_required
+)
+select
+  '00000000-0000-0000-0000-000000000010', code, label, class, parent_code, type, category,
+  is_auxiliary, is_active, plan_code, review_required
+from public.accounting_plan_catalog
+where plan_code = 'PCG'
+on conflict (company_id, code) do nothing;
+
 insert into public.accounts (company_id, code, label, class, type, category)
 values
   ('00000000-0000-0000-0000-000000000010', '401', 'Fournisseurs', '4', 'tiers', 'passif'),

@@ -16,13 +16,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,6 +44,7 @@ import EntryForm from '@/components/entries/EntryForm';
 import EntryValidator from '@/components/entries/EntryValidator';
 import { useUser } from '@/components/hooks/useUser';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
+import { cn } from '@/lib/utils';
 
 const JOURNALS = {
   'AC': 'Achats',
@@ -57,6 +53,15 @@ const JOURNALS = {
   'CA': 'Caisse',
   'OD': 'Op. Diverses',
   'AN': 'À Nouveau'
+};
+
+const JOURNAL_STYLES = {
+  'AC': { badge: 'bg-amber-50 text-amber-800 border-amber-200 font-semibold', dot: 'bg-amber-500' },
+  'VE': { badge: 'bg-blue-50 text-blue-800 border-blue-200 font-semibold', dot: 'bg-blue-500' },
+  'BQ': { badge: 'bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold', dot: 'bg-emerald-500' },
+  'CA': { badge: 'bg-cyan-50 text-cyan-800 border-cyan-200 font-semibold', dot: 'bg-cyan-500' },
+  'OD': { badge: 'bg-purple-50 text-purple-800 border-purple-200 font-semibold', dot: 'bg-purple-500' },
+  'AN': { badge: 'bg-slate-100 text-slate-800 border-slate-200 font-semibold', dot: 'bg-slate-500' }
 };
 
 export default function Entries() {
@@ -323,29 +328,42 @@ export default function Entries() {
     },
     {
       header: 'Journal',
-      render: (row) => (
-        <Badge variant="outline" className="bg-slate-100">
-          {row.journal}
-        </Badge>
-      )
+      render: (row) => {
+        const style = JOURNAL_STYLES[row.journal] || { badge: 'bg-slate-100 text-slate-700 border-slate-200', dot: 'bg-slate-400' };
+        return (
+          <Badge variant="outline" className={cn("text-xs px-2 py-0.5 inline-flex items-center gap-1.5", style.badge)}>
+            <span className={cn("w-1.5 h-1.5 rounded-full", style.dot)} />
+            <span>{row.journal}</span>
+          </Badge>
+        );
+      }
     },
     {
       header: 'Compte',
       render: (row) => (
-        <div>
-          <p className="font-medium text-slate-800">{row.account_code}</p>
-          <p className="text-xs text-slate-500">{row.account_label}</p>
+        <div className="flex items-center gap-2">
+          <span className="font-mono font-bold text-xs px-2 py-1 bg-slate-100 text-slate-800 rounded-md border border-slate-200/80">
+            {row.account_code}
+          </span>
+          <span className="text-xs text-slate-600 font-medium truncate max-w-[180px]" title={row.account_label}>
+            {row.account_label}
+          </span>
         </div>
       )
     },
     {
-      header: 'Libellé',
+      header: 'Libellé & Pièce',
       render: (row) => (
         <div>
-          <p className="text-sm text-slate-800">{row.label}</p>
-          {row.reference && (
-            <p className="text-xs text-slate-400">Réf: {row.reference}</p>
-          )}
+          <p className="text-sm font-medium text-slate-800">{row.label}</p>
+          <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+            {row.entry_number && (
+              <span className="font-mono text-slate-500">N° {row.entry_number}</span>
+            )}
+            {row.reference && (
+              <span>• Réf: {row.reference}</span>
+            )}
+          </div>
         </div>
       )
     },
@@ -355,7 +373,7 @@ export default function Entries() {
       cellClassName: 'text-right',
       render: (row) => {
         const amount = parseFloat(row.debit) || 0;
-        return <AmountDisplay amount={amount} className={amount > 0 ? "font-medium" : "text-slate-400"} />;
+        return <AmountDisplay amount={amount} className={amount > 0 ? "font-mono font-semibold text-slate-900" : "text-slate-300 font-mono"} />;
       }
     },
     {
@@ -364,16 +382,18 @@ export default function Entries() {
       cellClassName: 'text-right',
       render: (row) => {
         const amount = parseFloat(row.credit) || 0;
-        return <AmountDisplay amount={amount} className={amount > 0 ? "font-medium" : "text-slate-400"} />;
+        return <AmountDisplay amount={amount} className={amount > 0 ? "font-mono font-semibold text-slate-900" : "text-slate-300 font-mono"} />;
       }
     },
     {
       header: 'Lettrage',
       render: (row) => row.lettering ? (
-        <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+        <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 font-mono text-xs">
           {row.lettering}
         </Badge>
-      ) : null
+      ) : (
+        <span className="text-slate-300 text-xs">-</span>
+      )
     },
     {
       header: '',
@@ -453,50 +473,110 @@ export default function Entries() {
         }
       />
 
-      {/* Filtres */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+      {/* Filtres rapides par Journal */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
-            placeholder="Rechercher..."
+            placeholder="Rechercher par compte, libellé ou référence..."
             value={filters.search}
             onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))}
-            className="pl-10"
+            className="pl-10 h-10 bg-white border-slate-200 rounded-xl"
           />
         </div>
-        <Select value={filters.journal} onValueChange={(v) => setFilters(f => ({ ...f, journal: v }))}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Journal" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous les journaux</SelectItem>
-            {Object.entries(JOURNALS).map(([code, label]) => (
-              <SelectItem key={code} value={code}>{code} - {label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none bg-white p-1 rounded-xl border border-slate-200/80 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setFilters(f => ({ ...f, journal: 'all' }))}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0",
+              filters.journal === 'all'
+                ? "bg-slate-900 text-white shadow-xs"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            )}
+          >
+            Tous les journaux
+          </button>
+          {Object.entries(JOURNALS).map(([code, label]) => {
+            const isSelected = filters.journal === code;
+            const style = JOURNAL_STYLES[code];
+            return (
+              <button
+                key={code}
+                type="button"
+                onClick={() => setFilters(f => ({ ...f, journal: code }))}
+                className={cn(
+                  "px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5",
+                  isSelected
+                    ? "bg-[#1e3a5f] text-white shadow-xs"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                )}
+              >
+                <span className={cn("w-1.5 h-1.5 rounded-full", isSelected ? "bg-white" : style?.dot || "bg-slate-400")} />
+                <span>{code}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Validation partie double */}
       <EntryValidator entries={filteredEntries} />
 
-      {/* Totaux */}
+      {/* Totaux & Équilibre */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-slate-100 p-4">
-          <p className="text-sm text-slate-500 mb-1">Total Débit</p>
-          <AmountDisplay amount={totals.debit} size="lg" className="text-slate-800" />
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 mb-1">
+            <span className="text-xs font-semibold uppercase tracking-wider">Total Débit</span>
+            <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700">
+              <Plus className="h-4 w-4" />
+            </div>
+          </div>
+          <AmountDisplay amount={totals.debit} size="xl" className="text-slate-900 font-bold" />
+          <p className="text-xs text-slate-500 mt-1">{filteredEntries.length} ligne(s) mouvementée(s)</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-100 p-4">
-          <p className="text-sm text-slate-500 mb-1">Total Crédit</p>
-          <AmountDisplay amount={totals.credit} size="lg" className="text-slate-800" />
+
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 mb-1">
+            <span className="text-xs font-semibold uppercase tracking-wider">Total Crédit</span>
+            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-700">
+              <Plus className="h-4 w-4" />
+            </div>
+          </div>
+          <AmountDisplay amount={totals.credit} size="xl" className="text-slate-900 font-bold" />
+          <p className="text-xs text-slate-500 mt-1">{filteredEntries.length} ligne(s) mouvementée(s)</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-100 p-4">
-          <p className="text-sm text-slate-500 mb-1">Solde</p>
+
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 mb-1">
+            <span className="text-xs font-semibold uppercase tracking-wider">Équilibre de saisie</span>
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "text-[10px] font-bold", 
+                Math.abs(totals.debit - totals.credit) < 0.01 
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                  : "bg-rose-50 text-rose-700 border-rose-200"
+              )}
+            >
+              {Math.abs(totals.debit - totals.credit) < 0.01 ? 'Équilibré ✓' : 'Déséquilibré ⚠️'}
+            </Badge>
+          </div>
           <AmountDisplay 
             amount={totals.debit - totals.credit} 
-            size="lg" 
+            size="xl" 
             showSign
+            className={cn(
+              "font-bold",
+              Math.abs(totals.debit - totals.credit) < 0.01 ? "text-slate-900" : "text-rose-600"
+            )}
           />
+          <p className="text-xs text-slate-500 mt-1">
+            {Math.abs(totals.debit - totals.credit) < 0.01 
+              ? 'Principe de la partie double respecté' 
+              : 'Écart Débit / Crédit à régulariser'}
+          </p>
         </div>
       </div>
 

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useUser } from '@/components/hooks/useUser';
+import { createPageUrl } from '@/utils';
 import { usePermissions } from '@/components/hooks/usePermissions';
 import {
   ACTION_LABELS,
@@ -44,7 +46,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import PageHeader from '@/components/common/PageHeader';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { toast } from 'sonner';
 import { toastSupabaseError } from '@/lib/supabase-errors';
@@ -222,6 +223,8 @@ export default function CompanyUsers() {
   };
 
   const owners = members.filter((member) => member.role === 'owner' && member.status === 'active');
+  const admins = members.filter((member) => member.role === 'admin' && member.status === 'active');
+  const pending = members.filter((member) => member.status === 'pending');
   const canManage = can('users', 'update');
 
   if (loadingUser) {
@@ -234,32 +237,111 @@ export default function CompanyUsers() {
 
   return (
     <ProtectedRoute permission="users:read">
-      <div className="space-y-6">
-        <PageHeader
-          title="Utilisateurs"
-          subtitle={`Gérez les accès à ${activeCompany?.name || 'la société'}`}
-          actions={
-            can('users', 'create') && (
-              <Button className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={() => setShowInvite(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Inviter
-              </Button>
-            )
-          }
-        />
+      <div className="space-y-6 pb-16">
+        {/* En-tête coloré Violet */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-2 border-b border-slate-200/80">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
+                Utilisateurs & Permissions
+              </h1>
+              <Badge variant="outline" className="font-mono text-xs px-2.5 py-1 bg-violet-50 text-violet-800 border-violet-300">
+                Sécurité & Équipe
+              </Badge>
+            </div>
+            <p className="text-slate-500 mt-1 text-sm lg:text-base">
+              Gestion des accès, rôles et traçabilité pour <strong>{activeCompany?.name || 'votre société'}</strong>
+            </p>
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Membres ({members.length})
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Link to={createPageUrl('RolesManagement')}>
+              <Button variant="outline" className="gap-2 text-xs border-slate-200 bg-white">
+                <Shield className="h-4 w-4 text-violet-600" />
+                Matrice des Rôles
+              </Button>
+            </Link>
+            <Link to={createPageUrl('AuditLog')}>
+              <Button variant="outline" className="gap-2 text-xs border-slate-200 bg-white">
+                <SlidersHorizontal className="h-4 w-4 text-slate-500" />
+                Journal d'audit
+              </Button>
+            </Link>
+            {can('users', 'create') && (
+              <Button className="bg-violet-600 hover:bg-violet-700 text-white gap-2 shadow-sm" onClick={() => setShowInvite(true)}>
+                <Plus className="h-4 w-4" />
+                Inviter un membre
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Stats KPI Membres */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="rounded-2xl border-slate-200/80 bg-white shadow-xs">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Membres Actifs</span>
+                <div className="p-2 rounded-xl bg-violet-50 text-violet-700">
+                  <Users className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900">{members.filter(m => m.status === 'active').length}</div>
+              <p className="text-xs text-slate-500 mt-1">Utilisateurs connectés</p>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-slate-200/80 bg-white shadow-xs">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Propriétaires</span>
+                <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
+                  <Shield className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-amber-950 font-mono">{owners.length}</div>
+              <p className="text-xs text-slate-500 mt-1">Accès total à l'entreprise</p>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-slate-200/80 bg-white shadow-xs">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Administrateurs</span>
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-700">
+                  <Shield className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-blue-950 font-mono">{admins.length}</div>
+              <p className="text-xs text-slate-500 mt-1">Gestion des opérations</p>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-slate-200/80 bg-white shadow-xs">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">En attente</span>
+                <div className="p-2 rounded-xl bg-rose-50 text-rose-700">
+                  <Mail className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-rose-950 font-mono">{pending.length}</div>
+              <p className="text-xs text-slate-500 mt-1">Invitations en cours</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
+          <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
+            <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Users className="h-5 w-5 text-violet-600" />
+              Liste des Membres ({members.length})
             </CardTitle>
-            <CardDescription>
-              Les droits sont appliqués par la base de données : masquer un bouton ne suffit pas à
-              autoriser une action.
+            <CardDescription className="text-xs text-slate-500">
+              Les droits d'accès sont strictement appliqués au niveau base de données (Row Level Security).
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="p-4 sm:p-5 space-y-3">
             {isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
 
             {members.map((member) => {
@@ -271,11 +353,11 @@ export default function CompanyUsers() {
               return (
                 <div
                   key={member.id}
-                  className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4"
+                  className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/80 p-4 bg-white hover:bg-slate-50/60 transition-colors shadow-2xs"
                 >
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-slate-900">
+                      <span className="font-bold text-slate-900 text-sm">
                         {member.user_name || member.user_email}
                       </span>
                       <Badge className={status.className}>{status.label}</Badge>

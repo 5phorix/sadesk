@@ -26,12 +26,121 @@ import {
   TrendingUp,
   Users,
   WalletCards,
+  Receipt,
+  BookOpen,
+  Calculator,
+  Scale,
+  PieChart,
+  Building2,
+  Package,
+  FolderOpen,
+  Shield,
+  Layers,
+  Sparkles,
+  Link2,
+  Waves,
+  Camera,
+  CheckCircle2,
+  Gauge,
+  FileText,
+  ChevronDown,
+  ChevronsUpDown,
+  Search,
+  Bell,
+  History,
+  Settings
 } from 'lucide-react';
 import { format, startOfMonth, subMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
 
 const formatAmount = (value) => `${Math.round(value || 0).toLocaleString('fr-FR')} €`;
+
+const DASHBOARD_MODULES = [
+  {
+    category: 'Comptabilité & Déclarations',
+    description: 'Saisie, facturation, états légaux & clôtures',
+    badge: 'Comptabilité',
+    cardBg: 'bg-linear-to-b from-blue-50/80 via-white to-white border-blue-200/90 hover:border-blue-400',
+    headerBadge: 'bg-blue-100 text-blue-800 border-blue-200',
+    iconBg: 'bg-blue-600 text-white shadow-sm shadow-blue-500/30',
+    pillBg: 'bg-blue-50/70 text-blue-900 border-blue-200/80 hover:bg-blue-600 hover:text-white hover:border-blue-600',
+    icon: Receipt,
+    links: [
+      { name: 'Écritures', page: 'Entries', icon: Receipt },
+      { name: 'Journaux', page: 'Journals', icon: BookOpen },
+      { name: 'Plan comptable', page: 'Accounts', icon: BookOpen },
+      { name: 'Factures', page: 'Invoices', icon: FileText },
+      { name: 'Scanner facture', page: 'ScanInvoice', icon: Camera },
+      { name: 'Lettrage', page: 'Lettering', icon: Link2 },
+      { name: 'Rapprochement', page: 'BankReconciliation', icon: Calculator },
+      { name: 'Bilan & SIG', page: 'FinancialStatements', icon: Scale },
+      { name: 'Grand Livre & Balance', page: 'Reports', icon: BarChart3 },
+      { name: 'Immobilisations', page: 'FixedAssets', icon: Landmark },
+      { name: 'Clôtures mensuelles', page: 'MonthlyClosing', icon: CheckCircle2 },
+      { name: 'Contrôles comptables', page: 'Controls', icon: Shield },
+    ]
+  },
+  {
+    category: 'Trésorerie & Gestion',
+    description: 'Flux financiers, budgets, rentabilité & KPI',
+    badge: 'Finance & Gestion',
+    cardBg: 'bg-linear-to-b from-teal-50/80 via-white to-white border-teal-200/90 hover:border-teal-400',
+    headerBadge: 'bg-teal-100 text-teal-800 border-teal-200',
+    iconBg: 'bg-teal-600 text-white shadow-sm shadow-teal-500/30',
+    pillBg: 'bg-teal-50/70 text-teal-900 border-teal-200/80 hover:bg-teal-600 hover:text-white hover:border-teal-600',
+    icon: Waves,
+    links: [
+      { name: 'Prévision trésorerie', page: 'CashForecast', icon: Waves },
+      { name: 'Gestion Financière', page: 'FinancialManagement', icon: TrendingUp },
+      { name: 'Créances & relances', page: 'Receivables', icon: CircleAlert },
+      { name: 'Suivi budgétaire', page: 'BudgetTracking', icon: Gauge },
+      { name: 'Rentabilité', page: 'Profitability', icon: PieChart },
+      { name: 'Compta analytique', page: 'AnalyticalAccounting', icon: Layers },
+      { name: 'Calcul des coûts', page: 'Costing', icon: Calculator },
+      { name: 'Vue Performance', page: 'Performance', icon: Gauge },
+      { name: 'Aide à la décision', page: 'DecisionAssistant', icon: Sparkles },
+    ]
+  },
+  {
+    category: 'Commercial & Opérations',
+    description: 'Partenaires, stocks, documents & tâches',
+    badge: 'Opérations',
+    cardBg: 'bg-linear-to-b from-amber-50/80 via-white to-white border-amber-200/90 hover:border-amber-400',
+    headerBadge: 'bg-amber-100 text-amber-800 border-amber-200',
+    iconBg: 'bg-amber-600 text-white shadow-sm shadow-amber-500/30',
+    pillBg: 'bg-amber-50/70 text-amber-900 border-amber-200/80 hover:bg-amber-600 hover:text-white hover:border-amber-600',
+    icon: Building2,
+    links: [
+      { name: 'Clients & Fournisseurs', page: 'ThirdParties', icon: Building2 },
+      { name: 'Gestion des stocks', page: 'StockManagement', icon: Package },
+      { name: 'Documents & GED', page: 'Documents', icon: FolderOpen },
+      { name: 'Tâches & Équipe', page: 'Tasks', icon: CheckCircle2 },
+    ]
+  },
+  {
+    category: 'Administration & Système',
+    description: 'Utilisateurs, audits, imports/exports & paramétrage',
+    badge: 'Administration',
+    cardBg: 'bg-linear-to-b from-slate-100/80 via-white to-white border-slate-300/90 hover:border-slate-400',
+    headerBadge: 'bg-slate-200 text-slate-800 border-slate-300',
+    iconBg: 'bg-slate-700 text-white shadow-sm shadow-slate-600/30',
+    pillBg: 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-800 hover:text-white hover:border-slate-800',
+    icon: Shield,
+    links: [
+      { name: 'Utilisateurs', page: 'CompanyUsers', icon: Users },
+      { name: 'Rôles & Permissions', page: 'RolesManagement', icon: Shield },
+      { name: "Journal d'audit", page: 'AuditLog', icon: History },
+      { name: 'Import / Export FEC', page: 'ImportExport', icon: Layers },
+      { name: 'Sauvegarde / Restauration', page: 'BackupRestore', icon: CheckCircle2 },
+      { name: 'Notifications', page: 'NotificationSettings', icon: Bell },
+      { name: 'Paramètres société', page: 'Settings', icon: Settings },
+      { name: 'Guide & Documentation', page: 'Documentation', icon: BookOpen },
+    ]
+  }
+];
 
 function MetricCard({ label, value, note, icon: Icon, accent, trend }) {
   return (
@@ -57,9 +166,39 @@ function MetricCard({ label, value, note, icon: Icon, accent, trend }) {
 export default function ManagementDashboard() {
   const { user } = useUser();
   const [period, setPeriod] = useState('6');
+  const [openModules, setOpenModules] = useState(() => DASHBOARD_MODULES.map(m => m.category));
+  const [moduleSearch, setModuleSearch] = useState('');
   const { data: invoices = [], isLoading: invoicesLoading } = useInvoices();
   const { data: entries = [], isLoading: entriesLoading } = useAccountingEntries();
   const { data: thirdParties = [] } = useThirdParties();
+
+  const toggleModule = (category) => {
+    setOpenModules((prev) =>
+      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
+    );
+  };
+
+  const allExpanded = openModules.length === DASHBOARD_MODULES.length;
+
+  const toggleAllModules = () => {
+    if (allExpanded) {
+      setOpenModules([]);
+    } else {
+      setOpenModules(DASHBOARD_MODULES.map(m => m.category));
+    }
+  };
+
+  const filteredModules = useMemo(() => {
+    if (!moduleSearch.trim()) return DASHBOARD_MODULES;
+    const q = moduleSearch.toLowerCase();
+    return DASHBOARD_MODULES.map(mod => {
+      const matchCat = mod.category.toLowerCase().includes(q) || mod.description.toLowerCase().includes(q);
+      const matchedLinks = mod.links.filter(l => l.name.toLowerCase().includes(q));
+      if (matchCat) return mod;
+      if (matchedLinks.length > 0) return { ...mod, links: matchedLinks };
+      return null;
+    }).filter(Boolean);
+  }, [moduleSearch]);
 
   const metrics = useMemo(() => {
     const today = new Date();
@@ -101,7 +240,8 @@ export default function ManagementDashboard() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen space-y-6 bg-[#f5f7fa] p-1 pb-10">
+      <div className="min-h-screen space-y-7 bg-[#f5f7fa] p-1 pb-16">
+        {/* Hero Header */}
         <section className="relative overflow-hidden rounded-[28px] bg-[#102b46] px-6 py-7 text-white shadow-xl shadow-slate-900/10 lg:px-8">
           <div className="absolute -right-20 -top-28 h-72 w-72 rounded-full border-[36px] border-cyan-300/10" />
           <div className="absolute bottom-[-80px] right-40 h-52 w-52 rounded-full border-[24px] border-amber-300/10" />
@@ -114,13 +254,128 @@ export default function ManagementDashboard() {
               <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">Une lecture claire de votre activité, de votre rentabilité et des décisions à prendre aujourd’hui.</p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link to={createPageUrl('Invoices')}><Button className="gap-2 bg-cyan-300 text-[#102b46] hover:bg-cyan-200"><FilePlus2 className="h-4 w-4" /> Nouvelle facture</Button></Link>
-              <Link to={createPageUrl('Reports')}><Button variant="outline" className="gap-2 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"><BarChart3 className="h-4 w-4" /> Rapports</Button></Link>
+              <Link to={createPageUrl('Invoices')}><Button className="gap-2 bg-cyan-300 text-[#102b46] hover:bg-cyan-200 shadow-sm"><FilePlus2 className="h-4 w-4" /> Nouvelle facture</Button></Link>
+              <Link to={createPageUrl('Entries')}><Button className="gap-2 bg-blue-600 text-white hover:bg-blue-500 shadow-sm"><Receipt className="h-4 w-4" /> Saisir écriture</Button></Link>
+              <Link to={createPageUrl('FinancialStatements')}><Button variant="outline" className="gap-2 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"><Scale className="h-4 w-4" /> États Financiers</Button></Link>
             </div>
           </div>
           <div className="relative mt-8 flex items-center gap-2 text-xs text-slate-300"><CalendarDays className="h-4 w-4 text-cyan-200" /> Mis à jour le {format(new Date(), 'd MMMM yyyy', { locale: fr })}</div>
         </section>
 
+        {/* ==================================================================== */}
+        {/* MODULES & ACCÈS DIRECTS                                              */}
+        {/* ==================================================================== */}
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
+            <div className="flex items-center gap-2.5">
+              <div className="h-3 w-3 rounded-full bg-[#102b46]" />
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                  Modules et accès rapides
+                </h2>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="relative w-48 sm:w-60">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <Input
+                  placeholder="Filtrer les modules..."
+                  value={moduleSearch}
+                  onChange={(e) => setModuleSearch(e.target.value)}
+                  className="pl-8 h-8 text-xs bg-white border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={toggleAllModules}
+                className="gap-1.5 rounded-xl text-xs h-8 bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+              >
+                <ChevronsUpDown className="h-3.5 w-3.5 text-slate-500" />
+                {allExpanded ? 'Tout replier' : 'Tout déplier'}
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {filteredModules.map((mod) => {
+              const IconComponent = mod.icon;
+              const isExpanded = openModules.includes(mod.category);
+
+              return (
+                <div 
+                  key={mod.category}
+                  className={cn(
+                    "rounded-2xl border shadow-xs transition-all duration-200 overflow-hidden",
+                    mod.cardBg,
+                    isExpanded ? "shadow-md" : "hover:border-slate-300"
+                  )}
+                >
+                  {/* Header cliquable pour déplier/replier */}
+                  <button
+                    type="button"
+                    onClick={() => toggleModule(mod.category)}
+                    className="w-full p-4 flex items-center justify-between text-left transition-colors hover:bg-black/5"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={cn("p-2 rounded-xl flex items-center justify-center shrink-0", mod.iconBg)}>
+                        <IconComponent className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-slate-900 text-sm truncate">
+                            {mod.category}
+                          </h3>
+                        </div>
+                        <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                          {mod.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <div className="p-1 rounded-lg bg-white/60 text-slate-600 border border-slate-200/60">
+                        <ChevronDown className={cn(
+                          "h-4 w-4 transition-transform duration-200",
+                          isExpanded && "rotate-180"
+                        )} />
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Zone dépliante / accordéon avec les liens */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 pt-1 border-t border-slate-100/80 animate-in fade-in-50 duration-200">
+                      <div className="flex flex-wrap gap-1.5 pt-2">
+                        {mod.links.map((linkItem) => {
+                          const ItemIcon = linkItem.icon;
+                          return (
+                            <Link
+                              key={linkItem.name}
+                              to={createPageUrl(linkItem.page)}
+                              className={cn(
+                                "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all border shadow-2xs group",
+                                mod.pillBg
+                              )}
+                            >
+                              <ItemIcon className="h-3.5 w-3.5 opacity-75 group-hover:opacity-100 transition-opacity shrink-0" />
+                              <span className="truncate">{linkItem.name}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Indicateurs Clés */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="Chiffre d'affaires" value={formatAmount(metrics.totalSales)} note="Total facturé hors taxes" icon={TrendingUp} accent="bg-emerald-50 text-emerald-700" trend={metrics.trend} />
           <MetricCard label="Marge estimée" value={`${marginRate.toFixed(1)} %`} note={`${formatAmount(metrics.totalSales - metrics.totalPurchases)} de marge brute`} icon={Target} accent="bg-cyan-50 text-cyan-700" />
