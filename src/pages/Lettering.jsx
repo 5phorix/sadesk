@@ -22,6 +22,8 @@ import {
 import { format, parseISO } from 'date-fns';
 import { Link2, Link2Off, Sparkles, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { usePagination } from '@/components/common/usePagination';
+import PaginationBar from '@/components/common/PaginationBar';
 
 const euro = (value) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value || 0);
@@ -73,6 +75,9 @@ export default function Lettering() {
   const open = useMemo(() => scoped.filter((entry) => !entry.lettering), [scoped]);
   const groups = useMemo(() => letteringGroups(scoped), [scoped]);
   const suggestions = useMemo(() => suggestLettering(open), [open]);
+  const openPagination = usePagination(open, 15);
+  const suggestionsPagination = usePagination(suggestions, 10);
+  const groupsPagination = usePagination(groups, 10);
 
   const selection = useMemo(
     () => open.filter((entry) => selectedIds.includes(entry.id)),
@@ -245,7 +250,7 @@ export default function Lettering() {
                       </tr>
                     </thead>
                     <tbody>
-                      {open.map((entry) => (
+                      {openPagination.paginatedItems.map((entry) => (
                         <tr key={entry.id} className="border-b last:border-0 hover:bg-slate-50">
                           <td className="py-2">
                             <Checkbox
@@ -269,6 +274,7 @@ export default function Lettering() {
                   </table>
                 )}
               </CardContent>
+              <PaginationBar currentPage={openPagination.currentPage} totalPages={openPagination.totalPages} totalItems={openPagination.totalItems} pageSize={15} onPrevious={openPagination.goToPrevious} onNext={openPagination.goToNext} />
             </Card>
           </TabsContent>
 
@@ -293,7 +299,8 @@ export default function Lettering() {
                 </CardContent>
               </Card>
             ) : (
-              suggestions.map((suggestion, index) => (
+              <>
+              {suggestionsPagination.paginatedItems.map((suggestion, index) => (
                 <Card key={`${suggestion.accountCode}-${index}`}>
                   <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
                     <div className="text-sm">
@@ -316,7 +323,9 @@ export default function Lettering() {
                     </Button>
                   </CardContent>
                 </Card>
-              ))
+              ))}
+              <PaginationBar currentPage={suggestionsPagination.currentPage} totalPages={suggestionsPagination.totalPages} totalItems={suggestionsPagination.totalItems} pageSize={10} onPrevious={suggestionsPagination.goToPrevious} onNext={suggestionsPagination.goToNext} />
+              </>
             )}
           </TabsContent>
 
@@ -328,7 +337,8 @@ export default function Lettering() {
                 </CardContent>
               </Card>
             ) : (
-              groups.map((group) => (
+              <>
+              {groupsPagination.paginatedItems.map((group) => (
                 <Card key={group.code} className={group.isBalanced ? '' : 'border-red-300'}>
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="flex items-center gap-2 text-base">
@@ -371,7 +381,9 @@ export default function Lettering() {
                     </table>
                   </CardContent>
                 </Card>
-              ))
+              ))}
+              <PaginationBar currentPage={groupsPagination.currentPage} totalPages={groupsPagination.totalPages} totalItems={groupsPagination.totalItems} pageSize={10} onPrevious={groupsPagination.goToPrevious} onNext={groupsPagination.goToNext} />
+              </>
             )}
           </TabsContent>
         </Tabs>

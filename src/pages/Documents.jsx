@@ -31,6 +31,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { usePagination } from '@/components/common/usePagination';
+import PaginationBar from '@/components/common/PaginationBar';
 
 const CATEGORIES = [
   { value: 'all', label: 'Tous les documents', icon: FolderOpen },
@@ -154,6 +156,8 @@ export default function Documents() {
     total: documents.length,
     size: documents.reduce((sum, doc) => sum + (doc.file_size || 0), 0)
   };
+
+  const { paginatedItems: pagedDocuments, currentPage, totalPages, totalItems, goToPrevious, goToNext } = usePagination(filteredDocuments, 12);
 
   return (
     <div className="space-y-6 pb-16">
@@ -308,7 +312,7 @@ export default function Documents() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredDocuments.map((doc) => (
+          {pagedDocuments.map((doc) => (
             <Card key={doc.id} className="rounded-2xl border-slate-200/90 hover:border-sky-300 hover:shadow-md transition-all bg-white overflow-hidden shadow-xs">
               <CardContent className="p-4 flex flex-col justify-between h-full">
                 <div>
@@ -374,6 +378,8 @@ export default function Documents() {
           ))}
         </div>
       )}
+
+      <PaginationBar currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} pageSize={12} onPrevious={goToPrevious} onNext={goToNext} />
 
       {/* Modal confirmation suppression */}
       <AlertDialog open={!!deleteDoc} onOpenChange={() => setDeleteDoc(null)}>

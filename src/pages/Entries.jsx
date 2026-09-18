@@ -464,7 +464,7 @@ export default function Entries() {
             </Button>
             <Button 
               onClick={() => { setSelectedEntry(null); setFormOpen(true); }}
-              className="bg-[#1e3a5f] hover:bg-[#2d4a6f] gap-2"
+              className="bg-[#f5871f] hover:bg-[#e07715] text-[#142638] font-semibold rounded-lg gap-2"
             >
               <Plus className="h-4 w-4" />
               Nouvelle écriture
@@ -481,18 +481,18 @@ export default function Entries() {
             placeholder="Rechercher par compte, libellé ou référence..."
             value={filters.search}
             onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))}
-            className="pl-10 h-10 bg-white border-slate-200 rounded-xl"
+            className="pl-10 h-10 bg-white/75 border-slate-200 rounded-lg"
           />
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none bg-white p-1 rounded-xl border border-slate-200/80 shadow-2xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-sm">
           <button
             type="button"
             onClick={() => setFilters(f => ({ ...f, journal: 'all' }))}
             className={cn(
               "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0",
               filters.journal === 'all'
-                ? "bg-slate-900 text-white shadow-xs"
+                ? "bg-[#142638] text-white shadow-sm"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             )}
           >
@@ -509,7 +509,7 @@ export default function Entries() {
                 className={cn(
                   "px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5",
                   isSelected
-                    ? "bg-[#1e3a5f] text-white shadow-xs"
+                    ? "bg-[#142638] text-white shadow-sm"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 )}
               >
@@ -526,7 +526,7 @@ export default function Entries() {
 
       {/* Totaux & Équilibre */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+        <div className="bg-white/70 rounded-xl border border-slate-200 p-4 shadow-sm">
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-xs font-semibold uppercase tracking-wider">Total Débit</span>
             <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700">
@@ -537,7 +537,7 @@ export default function Entries() {
           <p className="text-xs text-slate-500 mt-1">{filteredEntries.length} ligne(s) mouvementée(s)</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+        <div className="bg-white/70 rounded-xl border border-slate-200 p-4 shadow-sm">
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-xs font-semibold uppercase tracking-wider">Total Crédit</span>
             <div className="p-1.5 rounded-lg bg-blue-50 text-blue-700">
@@ -548,7 +548,7 @@ export default function Entries() {
           <p className="text-xs text-slate-500 mt-1">{filteredEntries.length} ligne(s) mouvementée(s)</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+        <div className="bg-white/70 rounded-xl border border-slate-200 p-4 shadow-sm">
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-xs font-semibold uppercase tracking-wider">Équilibre de saisie</span>
             <Badge 

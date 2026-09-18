@@ -30,6 +30,8 @@ import {
 import { Plus, Shield, Edit, Trash2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { toastSupabaseError } from '@/lib/supabase-errors';
+import { usePagination } from '@/components/common/usePagination';
+import PaginationBar from '@/components/common/PaginationBar';
 
 const PERMISSION_MODULES = [
   { key: 'invoices', label: 'Facturation', permissions: ['create', 'read', 'update', 'delete'] },
@@ -68,6 +70,7 @@ export default function RolesManagement() {
     queryFn: async () => { const { data, error } = await supabase.from('roles').select('*').eq('company_id', user.active_company_id).order('name'); if (error) throw error; return data; },
     enabled: !!user?.active_company_id,
   });
+  const { paginatedItems: pagedRoles, currentPage, totalPages, totalItems, goToPrevious, goToNext } = usePagination(roles, 10);
 
   const handleOpenForm = (role = null) => {
     if (role) {
@@ -157,7 +160,7 @@ export default function RolesManagement() {
         />
 
         <div className="grid gap-4">
-          {roles.map((role) => (
+          {pagedRoles.map((role) => (
             <Card key={role.id}>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -211,6 +214,8 @@ export default function RolesManagement() {
             </Card>
           ))}
         </div>
+
+        <PaginationBar currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} pageSize={10} onPrevious={goToPrevious} onNext={goToNext} />
 
         {/* Formulaire */}
         <Sheet open={showForm} onOpenChange={setShowForm}>

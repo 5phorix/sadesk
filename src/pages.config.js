@@ -48,6 +48,7 @@
  * The mainPage value must match a key in the PAGES object exactly.
  */
 import Accounts from './pages/Accounts';
+import AnalysesAgregats from './pages/AnalysesAgregats';
 import AnalyticalAccounting from './pages/AnalyticalAccounting';
 import AuditLog from './pages/AuditLog';
 import Analysis from './pages/Analysis';
@@ -74,6 +75,7 @@ import MonthlyClosing from './pages/MonthlyClosing';
 import NotificationSettings from './pages/NotificationSettings';
 import Profitability from './pages/Profitability';
 import Performance from './pages/Performance';
+import QuickLinks from './pages/QuickLinks';
 import KpiManagement from './pages/KpiManagement';
 import Objectives from './pages/Objectives';
 import VarianceAnalysis from './pages/VarianceAnalysis';
@@ -95,9 +97,11 @@ import __Layout from './Layout.jsx';
 
 export const PAGES = {
     "Accounts": Accounts,
+    "AnalysesAgregats": AnalysesAgregats,
     "AnalyticalAccounting": AnalyticalAccounting,
     "AuditLog": AuditLog,
     "Analysis": Analysis,
+    "QuickLinks": QuickLinks,
     "BankReconciliation": BankReconciliation,
     "BackupRestore": BackupRestore,
     "BudgetTracking": BudgetTracking,

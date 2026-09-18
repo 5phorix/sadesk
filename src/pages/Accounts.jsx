@@ -63,6 +63,8 @@ import {
   inferAccountMeta,
   isPrincipalAccount
 } from '@/lib/accounting';
+import { usePagination } from '@/components/common/usePagination';
+import PaginationBar from '@/components/common/PaginationBar';
 
 export default function Accounts() {
   const [formOpen, setFormOpen] = useState(false);
@@ -200,6 +202,8 @@ export default function Accounts() {
       return true;
     });
   }, [accounts, filters, selectedClassTab]);
+
+  const { paginatedItems: pagedAccounts, currentPage, totalPages, totalItems, goToPrevious, goToNext } = usePagination(filteredAccounts, 20);
 
   // 5. Comptes groupés par classe pour l'affichage "grouped"
   const groupedAccounts = useMemo(() => {
@@ -962,7 +966,7 @@ export default function Accounts() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredAccounts.map(account => {
+                {pagedAccounts.map(account => {
                   const meta = getClassMeta(account.class, currentPlanCode);
                   return (
                     <tr key={account.id || account.code} className="hover:bg-slate-50/80 transition-colors">
@@ -1033,6 +1037,7 @@ export default function Accounts() {
               </tbody>
             </table>
           </div>
+          <PaginationBar currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} pageSize={20} onPrevious={goToPrevious} onNext={goToNext} />
         </div>
       )}
 

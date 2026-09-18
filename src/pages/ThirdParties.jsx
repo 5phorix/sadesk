@@ -46,6 +46,8 @@ import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { useUser } from '@/components/hooks/useUser';
 import { createPageUrl } from '@/utils';
 import { toast } from 'sonner';
+import { usePagination } from '@/components/common/usePagination';
+import PaginationBar from '@/components/common/PaginationBar';
 
 export default function ThirdParties() {
   const { user } = useUser();
@@ -115,6 +117,8 @@ export default function ThirdParties() {
     setSelectedParty(null);
     setFormOpen(true);
   };
+
+  const { paginatedItems: pagedParties, currentPage, totalPages, totalItems, goToPrevious, goToNext } = usePagination(filteredParties, 9);
 
   return (
     <ProtectedRoute>
@@ -192,7 +196,7 @@ export default function ThirdParties() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredParties.map((party) => (
+          {pagedParties.map((party) => (
             <a
               key={party.id}
               href={createPageUrl('ThirdPartyDetail') + '?id=' + party.id}
@@ -267,6 +271,8 @@ export default function ThirdParties() {
           ))}
         </div>
       )}
+
+      <PaginationBar currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} pageSize={9} onPrevious={goToPrevious} onNext={goToNext} />
 
       {/* Form Sheet */}
       <ThirdPartyForm

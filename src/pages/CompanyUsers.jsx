@@ -49,6 +49,8 @@ import { Badge } from '@/components/ui/badge';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { toast } from 'sonner';
 import { toastSupabaseError } from '@/lib/supabase-errors';
+import { usePagination } from '@/components/common/usePagination';
+import PaginationBar from '@/components/common/PaginationBar';
 
 const STATUS_STYLES = {
   active: { label: 'Actif', className: 'bg-emerald-100 text-emerald-800' },
@@ -149,6 +151,7 @@ export default function CompanyUsers() {
   });
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['company-users', companyId] });
+  const { paginatedItems: pagedMembers, currentPage, totalPages, totalItems, goToPrevious, goToNext } = usePagination(members, 10);
 
   const inviteMutation = useMutation({
     mutationFn: async (data) => {
@@ -344,7 +347,7 @@ export default function CompanyUsers() {
           <CardContent className="p-4 sm:p-5 space-y-3">
             {isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
 
-            {members.map((member) => {
+            {pagedMembers.map((member) => {
               const status = STATUS_STYLES[member.status] || STATUS_STYLES.inactive;
               const restricted = isRestricted(member.role, member.permissions);
               const isLastOwner = member.role === 'owner' && owners.length <= 1;
@@ -453,6 +456,7 @@ export default function CompanyUsers() {
               <p className="py-8 text-center text-sm text-slate-500">Aucun membre.</p>
             )}
           </CardContent>
+          <PaginationBar currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} pageSize={10} onPrevious={goToPrevious} onNext={goToNext} />
         </Card>
 
         <Dialog open={showInvite} onOpenChange={setShowInvite}>

@@ -32,6 +32,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import AmountDisplay from '@/components/common/AmountDisplay';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { usePagination } from '@/components/common/usePagination';
+import PaginationBar from '@/components/common/PaginationBar';
 
 export default function AnalyticalAccounting() {
   const { user } = useUser();
@@ -165,6 +167,10 @@ export default function AnalyticalAccounting() {
     ? analyticalData 
     : analyticalData.filter(d => d.code === selectedCenter);
 
+  const analyticalPagination = usePagination(filteredAnalytical, 10);
+  const budgetPagination = usePagination(budgetComparison, 10);
+  const centersPagination = usePagination(costCenters, 9);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -266,7 +272,7 @@ export default function AnalyticalAccounting() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {filteredAnalytical.map(data => (
+                {analyticalPagination.paginatedItems.map(data => (
                   <div key={data.code} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                     <div className="flex items-start justify-between mb-3">
                       <div>
@@ -301,6 +307,7 @@ export default function AnalyticalAccounting() {
                   </div>
                 ))}
               </div>
+              <PaginationBar currentPage={analyticalPagination.currentPage} totalPages={analyticalPagination.totalPages} totalItems={analyticalPagination.totalItems} pageSize={10} onPrevious={analyticalPagination.goToPrevious} onNext={analyticalPagination.goToNext} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -332,7 +339,7 @@ export default function AnalyticalAccounting() {
                   </ResponsiveContainer>
 
                   <div className="mt-6 space-y-3">
-                    {budgetComparison.map((item, idx) => (
+                    {budgetPagination.paginatedItems.map((item, idx) => (
                       <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
                         <div className="flex-1">
                           <p className="font-medium text-slate-800">{item.name}</p>
@@ -357,6 +364,7 @@ export default function AnalyticalAccounting() {
                       </div>
                     ))}
                   </div>
+                  <PaginationBar currentPage={budgetPagination.currentPage} totalPages={budgetPagination.totalPages} totalItems={budgetPagination.totalItems} pageSize={10} onPrevious={budgetPagination.goToPrevious} onNext={budgetPagination.goToNext} />
                 </>
               )}
             </CardContent>
@@ -365,7 +373,7 @@ export default function AnalyticalAccounting() {
 
         <TabsContent value="centers" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {costCenters.map(center => (
+            {centersPagination.paginatedItems.map(center => (
               <Card key={center.id} className={!center.is_active ? 'opacity-50' : ''}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
@@ -416,6 +424,7 @@ export default function AnalyticalAccounting() {
               </Card>
             ))}
           </div>
+          <PaginationBar currentPage={centersPagination.currentPage} totalPages={centersPagination.totalPages} totalItems={centersPagination.totalItems} pageSize={9} onPrevious={centersPagination.goToPrevious} onNext={centersPagination.goToNext} />
         </TabsContent>
       </Tabs>
 

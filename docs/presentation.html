@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>SADESK Compta — Présentation</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --navy: #101b3a;
+    --navy-2: #16224a;
+    --navy-3: #1c2b5a;
+    --orange: #f5871f;
+    --blue: #2f6fed;
+    --green: #1fa374;
+    --red: #d94f4f;
+    --amber: #e0a72e;
+    --text-light: #eef1f8;
+    --text-muted: #9fb0d0;
+    --card-bg: #ffffff;
+    --card-border: #e4e8f2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background: #eef1f7;
+    color: #1a1f36;
+  }
+  header.hero {
+    text-align: center;
+    padding: 40px 20px 20px;
+  }
+  header.hero h1 {
+    font-size: 2rem;
+    margin-bottom: 4px;
+  }
+  header.hero p {
+    color: #4a5578;
+    margin-top: 0;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 24px;
+    padding: 20px 32px 60px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .slide {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(20, 30, 70, 0.08);
+    display: flex;
+    flex-direction: column;
+  }
+  .mock {
+    background: var(--navy);
+    color: var(--text-light);
+    height: 260px;
+    padding: 14px;
+    display: flex;
+    gap: 10px;
+    position: relative;
+  }
+  .caption {
+    padding: 14px 16px 18px;
+  }
+  .caption .num {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--orange);
+    letter-spacing: 0.05em;
+  }
+  .caption h3 {
+    margin: 4px 0 6px;
+    font-size: 1.05rem;
+  }
+  .caption p {
+    margin: 0;
+    color: #4a5578;
+    font-size: 0.9rem;
+  }
+
+  /* --- shared mock UI pieces --- */
+  .sidebar {
+    width: 78px;
+    background: var(--navy-2);
+    border-radius: 8px;
+    padding: 8px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .sidebar .logo-dot {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    background: var(--orange);
+    margin: 0 auto 8px;
+  }
+  .sidebar .item {
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.12);
+  }
+  .sidebar .item.active { background: var(--orange); }
+  .content { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .topbar {
+    height: 14px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.08);
+    width: 60%;
+  }
+  .kpi-row { display: flex; gap: 8px; }
+  .kpi {
+    flex: 1;
+    background: var(--navy-3);
+    border-radius: 8px;
+    padding: 8px;
+  }
+  .kpi .label { font-size: 0.55rem; color: var(--text-muted); }
+  .kpi .value { font-size: 0.8rem; font-weight: 700; margin-top: 4px; }
+  .kpi .value.up { color: #6fd39a; }
+  .kpi .value.down { color: #f08c8c; }
+
+  .panel {
+    flex: 1;
+    background: var(--navy-3);
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .row { display: flex; align-items: center; gap: 6px; }
+  .row .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .row .line { flex: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.12); }
+  .row .line.short { width: 40%; }
+
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 60px; flex: 1; }
+  .bars .bar { flex: 1; background: var(--blue); border-radius: 3px 3px 0 0; }
+
+  .donut {
+    width: 60px; height: 60px; border-radius: 50%;
+    background: conic-gradient(var(--orange) 0% 45%, var(--blue) 45% 70%, var(--green) 70% 88%, var(--amber) 88% 100%);
+    margin: auto;
+  }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 6px; border-radius: 6px; font-size: 0.5rem; font-weight: 600;
+  }
+  .badge.red { background: rgba(217,79,79,0.2); color: #f08c8c; }
+  .badge.amber { background: rgba(224,167,46,0.2); color: #f2cd7a; }
+  .badge.green { background: rgba(31,163,116,0.2); color: #6fd39a; }
+
+  .btn {
+    align-self: flex-start;
+    background: var(--blue);
+    color: white;
+    font-size: 0.6rem;
+    padding: 6px 10px;
+    border-radius: 6px;
+  }
+
+  .table-mock { display: flex; flex-direction: column; gap: 4px; }
+  .table-mock .trow { display: flex; gap: 6px; }
+  .table-mock .cell { height: 7px; border-radius: 3px; background: rgba(255,255,255,0.1); }
+
+  .center-icon {
+    margin: auto;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+  }
+
+  footer {
+    text-align: center;
+    padding: 20px;
+    color: #7381a6;
+    font-size: 0.85rem;
+  }
+
+  @media print {
+    body { background: white; }
+    .slide { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>SADESK Compta</h1>
+  <p>De la donnée à la décision — votre comptabilité, plus simple, plus sûre, plus intelligente.</p>
+</header>
+
+<div class="grid">
+
+  <!-- 1. Page d'accueil -->
+  <div class="slide">
+    <div class="mock">
+      <div class="content" style="justify-content:center; align-items:center; text-align:center; gap:10px;">
+        <div class="logo-dot" style="width:34px;height:34px;border-radius:9px;"></div>
+        <div class="topbar" style="width:70%; height:16px;"></div>
+        <div class="row" style="width:80%;"><div class="badge green">Multi-sociétés</div><div class="badge amber">Sécurisé</div><div class="badge red">IA &amp; alertes</div></div>
+      </div>
+    </div>
+    <div class="caption">
+      <div class="num">1 · PAGE D'ACCUEIL</div>
+      <h3>Présentation de l'application et de ses atouts</h3>
+      <p>Multi-sociétés, sécurisée, IA &amp; alertes, rapports et tableau de bord.</p>
+    </div>
+  </div>
+
+  <!-- 2. Connexion -->
+  <div class="slide">
+    <div class="mock">
+      <div class="content" style="justify-content:center; gap:8px; max-width:260px; margin:auto;">
+        <div class="topbar" style="width:50%;"></div>
+        <div class="panel" style="gap:8px;">
+          <div class="row"><div class="line short"></div></div>
+          <div class="row"><div class="line"></div></div>
+          <div class="row"><div class="line"></div></div>
+          <div class="btn">Se connecter</div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <div class="num">2 · CONNEXION</div>
+      <h3>Accès sécurisé à votre espace comptable</h3>
+      <p>Authentification par e-mail/mot de passe, isolation stricte par société.</p>
+    </div>
+  </div>
+
+  <!-- 3. Tableau de bord -->
+  <div class="slide">
+    <div class="mock">
+      <div class="sidebar">
+        <div class="logo-dot"></div>
+        <div class="item active"></div><div class="item"></div><div class="item"></div><div class="item"></div><div class="item"></div><div class="item"></div>
+      </div>
+      <div class="content">
+        <div class="topbar"></div>
+        <div class="kpi-row">
+          <div class="kpi"><div class="label">CA</div><div class="value up">125 480 €</div></div>
+          <div class="kpi"><div class="label">Résultat</div><div class="value up">18 320 €</div></div>
+          <div class="kpi"><div class="label">Trésorerie</div><div class="value up">42 860 €</div></div>
+          <div class="kpi"><div class="label">BFR</div><div class="value down">-6 240 €</div></div>
+        </div>
+        <div class="row" style="flex:1; gap:8px;">
+          <div class="panel"><div class="bars"><div class="bar" style="height:40%"></div><div class="bar" style="height:60%"></div><div class="bar" style="height:35%"></div><div class="bar" style="height:70%"></div><div class="bar" style="height:50%"></div></div></div>
+          <div class="panel" style="flex:0 0 90px;"><div class="donut"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <div class="num">3 · TABLEAU DE BORD</div>
+      <h3>Vue d'ensemble de la situation financière</h3>
+      <p>Chiffre d'affaires, résultat, trésorerie, BFR, évolution et répartition des charges.</p>
+    </div>
+  </div>
+
+  <!-- 4. Collecter -->
+  <div class="slide">
+    <div class="mock">
+      <div class="sidebar">
+        <div class="logo-dot"></div>
+        <div class="item"></div><div class="item active"></div><div class="item"></div><div class="item"></div>
+      </div>
+      <div class="content">
+        <div class="topbar"></div>
+        <div class="panel" style="flex:1; align-items:center; justify-content:center; border:1px dashed rgba(255,255,255,0.25);">
+          <div class="center-icon">⬆<br/>Glissez-déposez vos fichiers ici<br/><span style="opacity:.6">CSV · JSON · PDF · OFX · QIF</span></div>
+        </div>
+        <div class="table-mock">
+          <div class="trow"><div class="cell" style="width:60%"></div><div class="cell" style="width:20%; background:var(--green);"></div></div>
+          <div class="trow"><div class="cell" style="width:50%"></div><div class="cell" style="width:20%; background:var(--green);"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <div class="num">4 · COLLECTER</div>
+      <h3>Import de documents, factures, relevés bancaires (CSV/JSON)</h3>
+      <p>Import assisté avec historique des dépôts.</p>
+    </div>
+  </div>
+
+  <!-- 5. Comptabiliser -->
+  <div class="slide">
+    <div class="mock">
+      <div class="sidebar">
+        <div class="logo-dot"></div>
+        <div class="item"></div><div class="item"></div><div class="item active"></div><div class="item"></div>
+      </div>
+      <div class="content">
+        <div class="row"><div class="badge amber">Brouillons (10)</div><div class="badge green">Validées (245)</div></div>
+        <div class="table-mock" style="flex:1;">
+          <div class="trow"><div class="cell" style="width:35%"></div><div class="cell" style="width:20%"></div><div class="cell" style="width:15%"></div><div class="cell" style="width:15%"></div></div>
+          <div class="trow"><div class="cell" style="width:35%"></div><div class="cell" style="width:20%"></div><div class="cell" style="width:15%"></div><div class="cell" style="width:15%"></div></div>
+          <div class="trow"><div class="cell" style="width:35%"></div><div class="cell" style="width:20%"></div><div class="cell" style="width:15%"></div><div class="cell" style="width:15%"></div></div>
+        </div>
+        <div class="row"><div class="btn">Valider la sélection</div><div class="btn" style="background:var(--navy-2)">Générer le FEC</div></div>
+      </div>
+    </div>
+    <div class="caption">
+      <div class="num">5 · COMPTABILISER</div>
+      <h3>Saisie en brouillon, validation humaine, FEC, à-nouveaux</h3>
+      <p>Aucune écriture n'est verrouillée sans validation explicite.</p>
+    </div>
+  </div>
+
+  <!-- 6. Contrôler -->
+  <div class="slide">
+    <div class="mock">
+      <div class="sidebar">
+        <div class="logo-dot"></div>
+        <div class="item"></div><div class="item"></div><div class="item"></div><div class="item active"></div>
+      </div>
+      <div class="content" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <div class="panel"><div class="badge red">Doublons détectés</div></div>
+        <div class="panel"><div class="badge amber">Comptes inconnus</div></div>
+        <div class="panel"><div class="badge red">Pièces déséquilibrées</div></div>
+        <div class="panel"><div class="badge amber">Impayés</div></div>
+        <div class="panel"><div class="badge green">Rapprochement bancaire</div></div>
+        <div class="panel"><div class="badge green">Clôtures mensuelles</div></div>
+      </div>
+    </div>
+    <div class="caption">
+      <div class="num">6 · CONTRÔLER</div>
+      <h3>Doublons, comptes inconnus, rapprochement bancaire, impayés…</h3>
+      <p>Anomalies détectées automatiquement, chacune reliée à son action de correction.</p>
+    </div>
+  </div>
+
+  <!-- 7. Analyser -->
+  <div class="slide">
+    <div class="mock">
+      <div class="sidebar">
+        <div class="logo-dot"></div>
+        <div class="item"></div><div class="item"></div><div class="item"></div><div class="item"></div><div class="item active"></div>
+      </div>
+      <div class="content">
+        <div class="row"><div class="badge green">Produits</div><div class="badge amber">Charges</div><div class="badge red">Résultat</div><div class="badge">Trésorerie</div></div>
+        <div class="row" style="flex:1; gap:8px;">
+          <div class="panel"><div class="bars"><div class="bar" style="height:30%"></div><div class="bar" style="height:55%"></div><div class="bar" style="height:45%"></div><div class="bar" style="height:65%"></div></div></div>
+          <div class="panel" style="flex:0 0 110px;">
+            <div class="row"><div class="dot" style="background:var(--orange)"></div><div class="line short"></div></div>
+            <div class="row"><div class="dot" style="background:var(--blue)"></div><div class="line short"></div></div>
+            <div class="row"><div class="dot" style="background:var(--green)"></div><div class="line short"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <div class="num">7 · ANALYSER</div>
+      <h3>Produits, charges, résultat, trésorerie, BFR et tendances</h3>
+      <p>Indicateurs clés, top produits et évolution mensuelle du chiffre d'affaires.</p>
+    </div>
+  </div>
+
+  <!-- 8. Aider à décider -->
+  <div class="slide">
+    <div class="mock">
+      <div class="sidebar">
+        <div class="logo-dot"></div>
+        <div class="item"></div><div class="item"></div><div class="item"></div><div class="item"></div><div class="item"></div><div class="item active"></div>
+      </div>
+      <div class="content">
+        <div class="panel">
+          <div class="badge amber">Recommandation prioritaire</div>
+          <div class="row"><div class="line"></div></div>
+          <div class="row"><div class="line short"></div></div>
+          <div class="btn">Voir les faits</div>
+        </div>
+        <div class="row" style="gap:8px;">
+          <div class="panel"><div class="badge green">Optimisation trésorerie</div></div>
+          <div class="panel"><div class="badge red">Alerte stock</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <div class="num">8 · AIDER À DÉCIDER</div>
+      <h3>Recommandations justifiées et liées à une action concrète</h3>
+      <p>Chaque recommandation cite ses faits et pointe vers l'écran d'action.</p>
+    </div>
+  </div>
+
+  <!-- 9. Rapprochement bancaire -->
+  <div class="slide">
+    <div class="mock">
+      <div class="sidebar">
+        <div class="logo-dot"></div>
+        <div class="item"></div><div class="item"></div><div class="item active"></div><div class="item"></div>
+      </div>
+      <div class="content">
+        <div class="row"><div class="line short"></div><div class="btn">Lancer le rapprochement</div></div>
+        <div class="kpi-row">
+          <div class="kpi"><div class="label">Transactions bancaires</div><div class="value">120</div></div>
+          <div class="kpi"><div class="label">Écritures rapprochées</div><div class="value up">118</div></div>
+          <div class="kpi"><div class="label">Écarts</div><div class="value down">2</div></div>
+        </div>
+        <div class="table-mock" style="flex:1;">
+          <div class="trow"><div class="cell" style="width:40%"></div><div class="cell" style="width:20%"></div><div class="cell" style="width:15%; background:var(--green);"></div></div>
+          <div class="trow"><div class="cell" style="width:40%"></div><div class="cell" style="width:20%"></div><div class="cell" style="width:15%; background:var(--red);"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <div class="num">9 · RAPPROCHEMENT BANCAIRE</div>
+      <h3>Automatique ou manuel, avec suivi des écarts</h3>
+      <p>Rapproche les relevés importés avec les écritures comptables.</p>
+    </div>
+  </div>
+
+  <!-- 10. Gestion des utilisateurs -->
+  <div class="slide">
+    <div class="mock">
+      <div class="sidebar">
+        <div class="logo-dot"></div>
+        <div class="item"></div><div class="item"></div><div class="item"></div><div class="item active"></div>
+      </div>
+      <div class="content">
+        <div class="row"><div class="badge">Gestion multi-sociétés</div><div class="badge">Gestion des utilisateurs</div></div>
+        <div class="table-mock" style="flex:1;">
+          <div class="trow"><div class="cell" style="width:30%"></div><div class="cell" style="width:20%"></div><div class="cell" style="width:25%"></div></div>
+          <div class="trow"><div class="cell" style="width:30%"></div><div class="cell" style="width:20%"></div><div class="cell" style="width:25%"></div></div>
+          <div class="trow"><div class="cell" style="width:30%"></div><div class="cell" style="width:20%"></div><div class="cell" style="width:25%"></div></div>
+        </div>
+        <div class="badge amber">Journal d'audit — toutes les actions tracées</div>
+      </div>
+    </div>
+    <div class="caption">
+      <div class="num">10 · GESTION DES UTILISATEURS &amp; JOURNAL D'AUDIT</div>
+      <h3>Cloisonnement par société, rôles et traçabilité</h3>
+      <p>Rôles : viewer, accountant, admin, owner.</p>
+    </div>
+  </div>
+
+  <!-- 11. Architecture -->
+  <div class="slide">
+    <div class="mock">
+      <div class="content" style="gap:10px;">
+        <div class="panel">
+          <div class="row"><div class="dot" style="background:var(--orange)"></div><b style="font-size:.65rem;">Cloisonnement par société</b></div>
+          <div class="row"><div class="line"></div></div>
+        </div>
+        <div class="panel">
+          <div class="row"><div class="dot" style="background:var(--green)"></div><b style="font-size:.65rem;">Supabase — Backend / base de données (RLS)</b></div>
+        </div>
+        <div class="panel">
+          <div class="row"><div class="dot" style="background:var(--blue)"></div><b style="font-size:.65rem;">React + Vite — Frontend</b></div>
+        </div>
+        <div class="panel">
+          <div class="row"><div class="dot" style="background:var(--amber)"></div><b style="font-size:.65rem;">Fonctions serveur (API) — IA, notifications, rapprochement</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">
+      <div class="num">11 · ARCHITECTURE</div>
+      <h3>Une architecture sécurisée et robuste</h3>
+      <p>Sécurité, performance et évolutivité — rôles vérifiés côté serveur, écritures verrouillées après validation.</p>
+    </div>
+  </div>
+
+</div>
+
+<footer>SADESK Compta — document de présentation interne</footer>
+
+</body>
+</html>

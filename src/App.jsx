@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -9,7 +9,9 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import Home from './pages/Home';
 import Login from './pages/Login';
+import ResetPassword from './pages/ResetPassword';
 import CompanySelector from './pages/CompanySelector';
 
 const { Pages, Layout, mainPage } = pagesConfig;
@@ -21,7 +23,8 @@ const LayoutWrapper = ({ children, currentPageName }) => currentPageName === 'Co
   : <>{children}</>;
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, user } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, user, isPasswordRecovery } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -32,12 +35,17 @@ const AuthenticatedApp = () => {
     );
   }
 
+  // Lien de réinitialisation de mot de passe : prioritaire sur tout le reste
+  if (isPasswordRecovery) {
+    return <ResetPassword />;
+  }
+
   // Handle authentication errors
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      return <Login />;
+      return showLogin ? <Login /> : <Home onLogin={() => setShowLogin(true)} />;
     }
   }
 

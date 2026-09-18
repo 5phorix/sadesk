@@ -41,6 +41,8 @@ import {
 import { format, parseISO, isPast } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { usePagination } from '@/components/common/usePagination';
+import PaginationBar from '@/components/common/PaginationBar';
 
 export default function Tasks() {
   const { user } = useUser();
@@ -162,6 +164,8 @@ export default function Tasks() {
     overdue: tasks.filter(t => isOverdue(t)).length
   };
 
+  const { paginatedItems: pagedTasks, currentPage, totalPages, totalItems, goToPrevious, goToNext } = usePagination(sortedTasks, 10);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -266,7 +270,7 @@ export default function Tasks() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {sortedTasks.map(task => (
+          {pagedTasks.map(task => (
             <Card 
               key={task.id} 
               className={`hover:shadow-lg transition-all ${
@@ -350,6 +354,8 @@ export default function Tasks() {
           ))}
         </div>
       )}
+
+      <PaginationBar currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} pageSize={10} onPrevious={goToPrevious} onNext={goToNext} />
 
       <TaskForm
         open={formOpen}

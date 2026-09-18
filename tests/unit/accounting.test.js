@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   autoReconcile,
   bestMatch,
+  buildFinancialStatements,
   detectAccountingAnomalies,
   duplicateEntryAnomalies,
   groupByJournal,
@@ -164,6 +165,58 @@ describe('signedAmount', () => {
   it('rend le debit positif et le credit negatif', () => {
     expect(signedAmount({ debit: 100, credit: 0 })).toBe(100);
     expect(signedAmount({ debit: 0, credit: 100 })).toBe(-100);
+  });
+});
+
+describe('états financiers', () => {
+  it('reconstitue le bilan avec les écritures antérieures et le résultat courant', () => {
+    const statements = buildFinancialStatements({
+      entries: [
+        { date: '2023-12-31', account_code: '101000', debit: 0, credit: 1000 },
+        { date: '2023-12-31', account_code: '512000', debit: 1000, credit: 0 },
+        { date: '2024-03-10', account_code: '512000', debit: 120, credit: 0 },
+        { date: '2024-03-10', account_code: '707000', debit: 0, credit: 120 },
+        { date: '2024-03-11', account_code: '607000', debit: 70, credit: 0 },
+        { date: '2024-03-11', account_code: '401000', debit: 0, credit: 70 }
+      ]
+    });
+
+    expect(statements.compteResultat.resultatNet).toBe(50);
+    expect(statements.bilan.actif.totalNet).toBe(1120);
+    expect(statements.bilan.passif.total).toBe(1120);
+    expect(statements.bilan.isBalanced).toBe(true);
+  });
+
+  it('classe le solde créditeur du compte 512 en découvert bancaire', () => {
+    const statements = buildFinancialStatements({
+      entries: [
+        { date: '2024-01-01', account_code: '101000', debit: 0, credit: 100 },
+        { date: '2024-01-01', account_code: '512000', debit: 100, credit: 0 },
+        { date: '2024-02-01', account_code: '607000', debit: 150, credit: 0 },
+        { date: '2024-02-01', account_code: '512000', debit: 0, credit: 150 }
+      ]
+    });
+
+    expect(statements.bilan.actif.actifCirculant.tresorerieActive.amount).toBe(0);
+    expect(statements.bilan.passif.tresoreriePassive.amount).toBe(50);
+    expect(statements.bilan.isBalanced).toBe(true);
+  });
+
+  it('déduit les réductions sur achats et ventes du résultat', () => {
+    const statements = buildFinancialStatements({
+      entries: [
+        { date: '2024-01-01', account_code: '707000', debit: 0, credit: 1000 },
+        { date: '2024-01-01', account_code: '709700', debit: 100, credit: 0 },
+        { date: '2024-01-02', account_code: '607000', debit: 600, credit: 0 },
+        { date: '2024-01-02', account_code: '609700', debit: 0, credit: 50 },
+        { date: '2024-01-02', account_code: '401000', debit: 0, credit: 550 },
+        { date: '2024-01-03', account_code: '512000', debit: 550, credit: 0 }
+      ]
+    });
+
+    expect(statements.sig.margeCommerciale.ventes.amount).toBe(900);
+    expect(statements.sig.margeCommerciale.achats.amount).toBe(550);
+    expect(statements.compteResultat.resultatNet).toBe(350);
   });
 });
 

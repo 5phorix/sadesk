@@ -658,6 +658,21 @@ function aggregateItem({ id, label, ruleDescription, prefixes = [], excludePrefi
   };
 }
 
+function netWithReduction(item, reduction) {
+  return {
+    ...item,
+    amount: round2(item.amount - reduction.amount),
+    accountsCount: item.accounts.length + reduction.accounts.length,
+    accounts: [
+      ...item.accounts,
+      ...reduction.accounts.map((account) => ({
+        ...account,
+        contribution: round2(-account.contribution)
+      }))
+    ].sort((left, right) => left.code.localeCompare(right.code))
+  };
+}
+
 /**
  * Calcule l'intégralité des états financiers (Bilan, SIG, Bilan fonctionnel)
  * avec traçabilité et explication comptable stricte de chaque ligne.
@@ -670,8 +685,8 @@ export function buildFinancialStatements({ entries = [], accounts = [], planCode
   /* 1. Soldes Intermédiaires de Gestion (SIG)                                */
   /* ------------------------------------------------------------------------ */
 
-  // A. Ventes de marchandises (707)
-  const ventesMarchandises = aggregateItem({
+  // A. Ventes nettes de marchandises (707 - 7097)
+  const ventesMarchandisesBrutes = aggregateItem({
     id: 'ventes_marchandises',
     label: 'Ventes de marchandises',
     ruleDescription: 'Produits issus des ventes de marchandises achetées pour être revendues sans transformation (Comptes 707)',
@@ -680,8 +695,19 @@ export function buildFinancialStatements({ entries = [], accounts = [], planCode
     mode: 'credit_minus_debit'
   });
 
-  // B. Achats de marchandises & variations (607 ± 6037)
-  const achatsMarchandises = aggregateItem({
+  const reductionsVentesMarchandises = aggregateItem({
+    id: 'reductions_ventes_marchandises',
+    label: 'Réductions sur ventes de marchandises',
+    ruleDescription: 'Rabais, remises, ristournes et retours sur ventes de marchandises (Compte 7097)',
+    prefixes: isSyscohada ? [] : ['7097'],
+    balances,
+    mode: 'debit_minus_credit'
+  });
+
+  const ventesMarchandises = netWithReduction(ventesMarchandisesBrutes, reductionsVentesMarchandises);
+
+  // B. Achats nets de marchandises & variations (607 + 6037 - 6097)
+  const achatsMarchandisesBruts = aggregateItem({
     id: 'achats_marchandises',
     label: 'Achats de marchandises & variations de stock',
     ruleDescription: 'Achats de marchandises revendues en l’état (607) corrigés de la variation de stock (6037)',
@@ -690,10 +716,21 @@ export function buildFinancialStatements({ entries = [], accounts = [], planCode
     mode: 'debit_minus_credit'
   });
 
+  const reductionsAchatsMarchandises = aggregateItem({
+    id: 'reductions_achats_marchandises',
+    label: 'Réductions sur achats de marchandises',
+    ruleDescription: 'Rabais, remises, ristournes et retours sur achats de marchandises (Compte 6097)',
+    prefixes: isSyscohada ? [] : ['6097'],
+    balances,
+    mode: 'credit_minus_debit'
+  });
+
+  const achatsMarchandises = netWithReduction(achatsMarchandisesBruts, reductionsAchatsMarchandises);
+
   const margeCommercialeAmount = round2(ventesMarchandises.amount - achatsMarchandises.amount);
 
-  // C. Production vendue (701 à 706, 708, 709)
-  const productionVendue = aggregateItem({
+  // C. Production vendue nette (701 à 706, 708 - 7091 à 7096/7098)
+  const productionVendueBrute = aggregateItem({
     id: 'production_vendue',
     label: 'Production vendue (Biens & Services)',
     ruleDescription: 'Ventes de produits finis, travaux et prestations de services (Comptes 701 à 706, 708)',
@@ -701,6 +738,17 @@ export function buildFinancialStatements({ entries = [], accounts = [], planCode
     balances,
     mode: 'credit_minus_debit'
   });
+
+  const reductionsProductionVendue = aggregateItem({
+    id: 'reductions_production_vendue',
+    label: 'Réductions sur production vendue',
+    ruleDescription: 'Rabais, remises, ristournes et retours sur production vendue (Comptes 7091 à 7096 et 7098)',
+    prefixes: isSyscohada ? [] : ['7091', '7092', '7093', '7094', '7095', '7096', '7098'],
+    balances,
+    mode: 'debit_minus_credit'
+  });
+
+  const productionVendue = netWithReduction(productionVendueBrute, reductionsProductionVendue);
 
   // D. Production stockée & immobilisée (71, 72)
   const productionStockeeImmobilisee = aggregateItem({
@@ -1119,8 +1167,8 @@ export function buildFinancialStatements({ entries = [], accounts = [], planCode
   const tresoreriePassive = aggregateItem({
     id: 'tresorerie_passive',
     label: 'Concours bancaires courants & Découverts',
-    ruleDescription: 'Découverts bancaires autorisés et soldes créditeurs de banque (Comptes 519, 5186)',
-    prefixes: ['519', '5186'],
+    ruleDescription: 'Découverts bancaires autorisés et soldes créditeurs des comptes financiers (Comptes 512, 514, 519, 5186)',
+    prefixes: ['512', '514', '519', '5186'],
     balances,
     mode: 'solde_crediteur'
   });

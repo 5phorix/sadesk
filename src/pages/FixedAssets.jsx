@@ -10,9 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Building2, Euro, Pencil, Plus } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Building2, Euro, Pencil, Plus, CalendarCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { assetImpairment, buildDepreciationEntries, buildDepreciationPlan, buildDisposalEntries, buildImpairmentEntries, straightLineDepreciation } from '@/lib/auxiliaryAccounting';
+import { assetImpairment, buildDepreciationEntries, buildDepreciationPlan, buildDisposalEntries, buildImpairmentEntries, computeYearlyDepreciation, straightLineDepreciation } from '@/lib/auxiliaryAccounting';
 
 const emptyAsset = {
   name: '',
@@ -38,6 +39,7 @@ export default function FixedAssets() {
   const [editingAsset, setEditingAsset] = useState(null);
   const [disposalAsset, setDisposalAsset] = useState(null);
   const [impairmentAsset, setImpairmentAsset] = useState(null);
+  const [closingYear, setClosingYear] = useState(String(new Date().getFullYear()));
 
   const { data: assets = [], isLoading } = useQuery({
     queryKey: ['fixed-assets', companyId],
@@ -81,6 +83,46 @@ export default function FixedAssets() {
       toast.success('Plan d’amortissement généré');
     },
     onError: (error) => toast.error(error.message || 'Impossible de générer le plan'),
+  });
+
+  // Calcule et comptabilise en une fois la dotation de l'exercice pour chaque immobilisation,
+  // avec prorata automatique à la mise en service et à la sortie.
+  const yearEndMutation = useMutation({
+    mutationFn: async (year) => {
+      const generated = [];
+      for (const asset of assets) {
+        const yearly = computeYearlyDepreciation(asset, year);
+        if (!yearly) continue;
+        const alreadyExists = depreciations.some((period) => period.asset_id === asset.id && period.period_start === yearly.period_start && period.period_end === yearly.period_end);
+        if (alreadyExists) continue;
+
+        const { data: created, error: insertError } = await supabase
+          .from('fixed_asset_depreciations')
+          .insert({ company_id: companyId, asset_id: asset.id, period_start: yearly.period_start, period_end: yearly.period_end, amount: yearly.amount })
+          .select()
+          .single();
+        if (insertError) throw insertError;
+
+        const entries = buildDepreciationEntries(asset, yearly, companyId);
+        const { error: entryError } = await supabase.from('accounting_entries').insert(entries);
+        if (entryError) throw entryError;
+
+        const { error: updateError } = await supabase
+          .from('fixed_asset_depreciations')
+          .update({ is_posted: true, accounting_entry_number: entries[0].entry_number })
+          .eq('id', created.id)
+          .eq('company_id', companyId);
+        if (updateError) throw updateError;
+        generated.push(asset.name);
+      }
+      return generated;
+    },
+    onSuccess: (generated) => {
+      queryClient.invalidateQueries({ queryKey: ['fixed-asset-depreciations', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['entries', companyId] });
+      toast.success(generated.length ? `${generated.length} dotation(s) de l'exercice générée(s) en brouillon` : "Aucune dotation à générer pour cet exercice");
+    },
+    onError: (error) => toast.error(error.message || "Impossible de générer les dotations de l'exercice"),
   });
 
   const postMutation = useMutation({
@@ -178,7 +220,14 @@ export default function FixedAssets() {
     <PageHeader
       title="Immobilisations"
       subtitle="Suivi des biens, amortissements et valeurs nettes"
-      actions={<Button onClick={() => { setEditingAsset(null); setFormOpen(true); }} className="gap-2"><Plus className="h-4 w-4" />Nouvelle immobilisation</Button>}
+      actions={<div className="flex flex-wrap items-center gap-2">
+        <Select value={closingYear} onValueChange={setClosingYear}>
+          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+          <SelectContent>{Array.from({ length: 5 }, (_, index) => new Date().getFullYear() - 3 + index).map((year) => <SelectItem key={year} value={String(year)}>{year}</SelectItem>)}</SelectContent>
+        </Select>
+        <Button variant="outline" className="gap-2" disabled={yearEndMutation.isPending} onClick={() => yearEndMutation.mutate(Number(closingYear))}><CalendarCheck className="h-4 w-4" />Générer les dotations {closingYear}</Button>
+        <Button onClick={() => { setEditingAsset(null); setFormOpen(true); }} className="gap-2"><Plus className="h-4 w-4" />Nouvelle immobilisation</Button>
+      </div>}
     />
     <div className="grid gap-4 sm:grid-cols-2"><Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4" />Actifs suivis</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{assets.length}</p></CardContent></Card><Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Euro className="h-4 w-4" />Coût historique</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{totalCost.toFixed(2)} €</p></CardContent></Card></div>
     <Card><CardHeader><CardTitle>Registre des immobilisations</CardTitle></CardHeader><CardContent>{isLoading ? <p>Chargement…</p> : assets.length === 0 ? <p className="text-sm text-slate-500">Aucune immobilisation enregistrée.</p> : <div className="divide-y">{assets.map((asset) => { const preview = straightLineDepreciation({ ...asset, accumulated_depreciation: 0 }, asset.in_service_date, asset.in_service_date); const assetDepreciations = depreciations.filter((item) => item.asset_id === asset.id); const assetImpairments = impairments.filter((item) => item.asset_id === asset.id); const pendingPeriods = assetDepreciations.filter((item) => !item.is_posted); return <div key={asset.id} className="flex flex-wrap items-center justify-between gap-3 py-4"><div><p className="font-medium">{asset.asset_code} · {asset.name}</p><p className="text-sm text-slate-500">{asset.category} · Mise en service {asset.in_service_date}{asset.disposal_date ? ` · Sortie ${asset.disposal_date}` : ''}</p></div><div className="flex flex-wrap items-center justify-end gap-3"><Badge variant="outline">{asset.useful_life_months} mois</Badge><span className="text-sm">Dotation mensuelle : <strong>{preview.monthlyAmount.toFixed(2)} €</strong></span><Badge>{asset.status}</Badge><Badge variant="secondary">{assetDepreciations.length} / {asset.useful_life_months} périodes</Badge>{assetImpairments.length > 0 && <Badge variant="secondary">Dépréciation : {assetImpairments.length}</Badge>}{asset.status !== 'disposed' && <><Button variant="outline" size="sm" disabled={planMutation.isPending} onClick={() => planMutation.mutate(asset)}>Générer le plan</Button><Button variant="outline" size="sm" disabled={!pendingPeriods.length || postMutation.isPending} onClick={() => postMutation.mutate(asset)}>Comptabiliser ({pendingPeriods.length})</Button><Button variant="outline" size="sm" onClick={() => setImpairmentAsset(asset)}>Déprécier</Button><Button variant="outline" size="sm" onClick={() => setDisposalAsset(asset)}>Sortir</Button></>}<Button variant="ghost" size="icon" aria-label={`Modifier ${asset.name}`} onClick={() => { setEditingAsset(asset); setFormOpen(true); }}><Pencil className="h-4 w-4" /></Button></div></div>; })}</div>}</CardContent></Card>

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useUser } from '@/components/hooks/useUser';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -13,15 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { 
-  TrendingUp,
+import {
   AlertCircle, 
   CheckCircle2, 
-  Scale,
   Info,
   BookOpen,
   Building,
-  Target,
   FileSpreadsheet
 } from 'lucide-react';
 import AmountDisplay from '@/components/common/AmountDisplay';
@@ -31,7 +28,7 @@ import { cn } from '@/lib/utils';
 export default function FinancialStatements() {
   const { user } = useUser();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-  const [activeTab, setActiveTab] = useState('compte_resultat');
+  const [activeTab, setActiveTab] = useState('bilan');
   const [selectedDrillDown, setSelectedDrillDown] = useState(null);
 
   const activeCompanyId = user?.active_company_id;
@@ -115,32 +112,7 @@ export default function FinancialStatements() {
     });
   }, [yearEntries, accounts, planCode]);
 
-  const { sig, compteResultat, bilan, bilanFonctionnel } = statements;
-
-  // Seuil de rentabilité dérivé des SIG
-  const seuilRentabilite = useMemo(() => {
-    const ca = sig.chiffreAffairesTotal;
-    const chargesVariables = sig.margeCommerciale.achats.amount + sig.valeurAjoutee.consommationsTiers.amount;
-    const chargesFixes = sig.ebe.impotsTaxes.amount + sig.ebe.chargesPersonnel.amount + sig.rex.dotationsAmortissements.amount + sig.rcai.chargesFinancieres.amount;
-    
-    const margeSurCoutVar = ca - chargesVariables;
-    const tauxMargeVariable = ca > 0 ? (margeSurCoutVar / ca) : 0;
-    const seuilCA = tauxMargeVariable > 0 ? (chargesFixes / tauxMargeVariable) : 0;
-    const pointMort = ca > 0 ? Math.min(365, Math.max(0, 365 * (seuilCA / ca))) : 0;
-    const margeSecurite = ca - seuilCA;
-    const tauxMargeSecurite = ca > 0 ? (margeSecurite / ca * 100) : 0;
-
-    return {
-      ca,
-      chargesVariables,
-      chargesFixes,
-      seuilCA,
-      pointMort,
-      margeSecurite,
-      tauxMargeSecurite,
-      atteint: ca >= seuilCA && ca > 0
-    };
-  }, [sig]);
+  const { compteResultat, bilan } = statements;
 
   // Composant réutilisable pour afficher une ligne financière avec bouton d'explication / drill-down
   const FinancialRow = ({ 
@@ -269,28 +241,35 @@ export default function FinancialStatements() {
   };
 
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-7 pb-16">
       {/* En-tête */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-2 border-b border-slate-200/80">
+      <div className="relative overflow-hidden rounded-2xl border border-[#e2e8f0] bg-[#142638] px-6 py-6 text-white shadow-xl shadow-slate-900/10 lg:px-8">
+        <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full border border-[#f5871f]/25" />
+        <div className="absolute right-10 top-8 h-28 w-28 rounded-full border border-[#f5871f]/15" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
-              États Financiers
+          <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#f5871f]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#f5871f]" />
+            Clôture & analyse
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-semibold tracking-[-0.03em] lg:text-4xl">
+              États financiers
             </h1>
-            <Badge variant="outline" className="font-mono text-xs px-2.5 py-1 bg-slate-100/80 text-slate-700 border-slate-300">
+            <Badge variant="outline" className="border-white/20 bg-white/10 font-mono text-xs text-slate-100">
               {planCode} • {planCode === 'SYSCOHADA' ? 'Système Comptable OHADA' : 'Plan Comptable Général Français'}
             </Badge>
           </div>
-          <p className="text-slate-500 mt-1 text-sm lg:text-base">
-            Compte de résultat officiel, Bilan complet multi-colonnes, Soldes Intermédiaires de Gestion et Bilan Fonctionnel
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300 lg:text-base">
+            Bilan complet multi-colonnes et compte de résultat officiel calculés à partir de vos comptes
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-xs">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Exercice :</span>
+          <div className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 backdrop-blur-sm">
+            <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">Exercice analysé</span>
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-28 h-8 font-bold border-0 shadow-none focus:ring-0">
+              <SelectTrigger className="h-8 w-32 border-0 bg-transparent p-0 text-base font-bold text-white shadow-none focus:ring-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -303,11 +282,12 @@ export default function FinancialStatements() {
             </Select>
           </div>
         </div>
+        </div>
       </div>
 
       {/* Barre d'alerte équilibre comptable */}
       <div className={cn(
-        "p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs",
+        "p-3.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs bg-white/70",
         bilan.isBalanced 
           ? "bg-emerald-50/70 border-emerald-200 text-emerald-900" 
           : "bg-amber-50/70 border-amber-200 text-amber-900"
@@ -339,26 +319,14 @@ export default function FinancialStatements() {
 
       {/* Onglets des États Financiers */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 flex flex-wrap gap-1 h-auto">
-          <TabsTrigger value="compte_resultat" className="rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs">
-            <FileSpreadsheet className="h-4 w-4 mr-1.5 text-blue-600" />
-            Compte de Résultat Officiel
-          </TabsTrigger>
-          <TabsTrigger value="bilan" className="rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs">
+        <TabsList className="w-full justify-start overflow-x-auto rounded-xl border border-[#e2e8f0] bg-[#f1f5f9] p-1 gap-1">
+          <TabsTrigger value="bilan" className="rounded-lg px-4 py-2.5 text-xs font-semibold data-[state=active]:bg-[#142638] data-[state=active]:text-white data-[state=active]:shadow-md">
             <Building className="h-4 w-4 mr-1.5 text-purple-600" />
             Bilan Comptable Détaillé
           </TabsTrigger>
-          <TabsTrigger value="sig" className="rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs">
-            <TrendingUp className="h-4 w-4 mr-1.5 text-indigo-600" />
-            Soldes Intermédiaires (SIG)
-          </TabsTrigger>
-          <TabsTrigger value="fonctionnel" className="rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs">
-            <Scale className="h-4 w-4 mr-1.5 text-emerald-600" />
-            Bilan Fonctionnel & BFR
-          </TabsTrigger>
-          <TabsTrigger value="seuil" className="rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs">
-            <Target className="h-4 w-4 mr-1.5 text-amber-600" />
-            Seuil de Rentabilité
+          <TabsTrigger value="compte_resultat" className="rounded-lg px-4 py-2.5 text-xs font-semibold data-[state=active]:bg-[#142638] data-[state=active]:text-white data-[state=active]:shadow-md">
+            <FileSpreadsheet className="h-4 w-4 mr-1.5 text-blue-600" />
+            Compte de Résultat Officiel
           </TabsTrigger>
         </TabsList>
 
@@ -670,321 +638,6 @@ export default function FinancialStatements() {
 
           </div>
         </TabsContent>
-
-        {/* ==================================================================== */}
-        {/* ONGLET 3 : SOLDES INTERMÉDIAIRES DE GESTION (SIG)                     */}
-        {/* ==================================================================== */}
-        <TabsContent value="sig" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-linear-to-br from-blue-50/50 to-white">
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Chiffre d’Affaires</span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
-                  <AmountDisplay amount={sig.chiffreAffairesTotal} />
-                </div>
-                <p className="text-xs text-slate-500 mt-1">Ventes de marchandises & prestations</p>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-linear-to-br from-purple-50/50 to-white">
-              <CardContent className="p-5">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Valeur Ajoutée (VA)</span>
-                    <div className="text-2xl font-bold text-purple-950 mt-1">
-                      <AmountDisplay amount={sig.valeurAjoutee.amount} />
-                    </div>
-                  </div>
-                  <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-xs">
-                    {sig.valeurAjoutee.tauxVA.toFixed(1)} % CA
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">Richesse brute créée par l’activité</p>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-linear-to-br from-emerald-50/50 to-white">
-              <CardContent className="p-5">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Résultat Net</span>
-                    <div className="text-2xl font-bold text-emerald-950 mt-1">
-                      <AmountDisplay amount={sig.resultatNet.amount} />
-                    </div>
-                  </div>
-                  <Badge className={cn("text-xs", sig.resultatNet.amount >= 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800")}>
-                    {sig.resultatNet.tauxMargeNette.toFixed(1)} % CA
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">Bénéfice net / Perte de l’exercice</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Tableau détaillé des étapes des SIG avec Drill-down */}
-          <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
-            <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
-              <div>
-                <CardTitle className="text-lg font-bold text-slate-900">
-                  Soldes Intermédiaires de Gestion ({selectedYear})
-                </CardTitle>
-                <CardDescription className="text-xs text-slate-500">
-                  Décomposition réglementaire du compte de résultat. Cliquez sur l’icône ℹ️ pour inspecter chaque compte contributeur.
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 space-y-4">
-              {/* Étape 1 : Marge Commerciale */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">1. Activité Commerciale</div>
-                <FinancialRow label="Ventes de marchandises (707)" amount={sig.margeCommerciale.ventes.amount} aggregateItem={sig.margeCommerciale.ventes} level={1} />
-                <FinancialRow label="- Achats de marchandises & variation stock (607, 6037)" amount={sig.margeCommerciale.achats.amount} aggregateItem={sig.margeCommerciale.achats} isNegative level={1} />
-                <FinancialRow label="= Marge Commerciale" amount={sig.margeCommerciale.amount} isSubtotal badge={`Taux : ${sig.margeCommerciale.taux}%`} />
-              </div>
-
-              {/* Étape 2 : Production de l'exercice */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">2. Activité de Production</div>
-                <FinancialRow label="Production vendue (Biens & Services 701-706)" amount={sig.productionExercice.productionVendue.amount} aggregateItem={sig.productionExercice.productionVendue} level={1} />
-                <FinancialRow label="Production stockée & immobilisée (71, 72)" amount={sig.productionExercice.productionStockeeImmobilisee.amount} aggregateItem={sig.productionExercice.productionStockeeImmobilisee} level={1} />
-                <FinancialRow label="= Production de l’exercice" amount={sig.productionExercice.amount} isSubtotal />
-              </div>
-
-              {/* Étape 3 : Valeur Ajoutée */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">3. Création de Valeur</div>
-                <FinancialRow label="- Consommations en provenance des tiers (601-606, 61, 62)" amount={sig.valeurAjoutee.consommationsTiers.amount} aggregateItem={sig.valeurAjoutee.consommationsTiers} isNegative level={1} />
-                <FinancialRow label="= Valeur Ajoutée (VA)" amount={sig.valeurAjoutee.amount} isSubtotal badge={`Taux : ${sig.valeurAjoutee.tauxVA}%`} />
-              </div>
-
-              {/* Étape 4 : Excédent Brut d'Exploitation */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">4. Performance d’Exploitation Brute</div>
-                <FinancialRow label="+ Subventions d’exploitation (74)" amount={sig.ebe.subventionsExploitation.amount} aggregateItem={sig.ebe.subventionsExploitation} level={1} />
-                <FinancialRow label="- Impôts, taxes et versements assimilés (63)" amount={sig.ebe.impotsTaxes.amount} aggregateItem={sig.ebe.impotsTaxes} isNegative level={1} />
-                <FinancialRow label="- Charges de personnel (Salaires & Charges 64)" amount={sig.ebe.chargesPersonnel.amount} aggregateItem={sig.ebe.chargesPersonnel} level={1} />
-                <FinancialRow label="= Excédent Brut d’Exploitation (EBE)" amount={sig.ebe.amount} isSubtotal badge={`Taux : ${sig.ebe.tauxEBE}%`} />
-              </div>
-
-              {/* Étape 5 : Résultat d'Exploitation */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">5. Résultat d’Exploitation Net</div>
-                <FinancialRow label="+ Autres produits d’exploitation & reprises (75, 781, 791)" amount={sig.rex.autresProduitsExploitation.amount} aggregateItem={sig.rex.autresProduitsExploitation} level={1} />
-                <FinancialRow label="- Autres charges de gestion courante (65)" amount={sig.rex.autresChargesExploitation.amount} aggregateItem={sig.rex.autresChargesExploitation} isNegative level={1} />
-                <FinancialRow label="- Dotations aux amortissements et provisions (681)" amount={sig.rex.dotationsAmortissements.amount} aggregateItem={sig.rex.dotationsAmortissements} isNegative level={1} />
-                <FinancialRow label="= Résultat d’Exploitation (REX)" amount={sig.rex.amount} isSubtotal />
-              </div>
-
-              {/* Étape 6 & 7 : Résultat Financier et RCAI */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">6. Activité Financière & RCAI</div>
-                <FinancialRow label="+ Produits financiers (76, 786, 796)" amount={sig.rcai.produitsFinanciers.amount} aggregateItem={sig.rcai.produitsFinanciers} level={1} />
-                <FinancialRow label="- Charges financières (66, 686)" amount={sig.rcai.chargesFinancieres.amount} aggregateItem={sig.rcai.chargesFinancieres} isNegative level={1} />
-                <FinancialRow label="= Résultat Courant Avant Impôts (RCAI)" amount={sig.rcai.amount} isSubtotal />
-              </div>
-
-              {/* Étape 8 : Exceptionnel / HAO et Résultat Net */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">7. Exceptionnel, Impôts & Résultat Final</div>
-                <FinancialRow label="+ Produits exceptionnels / HAO" amount={sig.resultatExceptionnel.produitsExceptionnels.amount} aggregateItem={sig.resultatExceptionnel.produitsExceptionnels} level={1} />
-                <FinancialRow label="- Charges exceptionnelles / HAO" amount={sig.resultatExceptionnel.chargesExceptionnelles.amount} aggregateItem={sig.resultatExceptionnel.chargesExceptionnelles} isNegative level={1} />
-                <FinancialRow label="- Impôt sur les sociétés & Participation (69)" amount={sig.resultatNet.impotsBenefices.amount} aggregateItem={sig.resultatNet.impotsBenefices} isNegative level={1} />
-                <FinancialRow label="= RÉSULTAT NET DE L’EXERCICE" amount={sig.resultatNet.amount} isTotal />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ==================================================================== */}
-        {/* ONGLET 4 : BILAN FONCTIONNEL, FRNG, BFR & TRÉSORERIE NETTE            */}
-        {/* ==================================================================== */}
-        <TabsContent value="fonctionnel" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* FRNG */}
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-linear-to-br from-indigo-50/50 to-white">
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">FRNG (Fonds de Roulement)</span>
-                <div className="text-2xl font-bold text-indigo-950 mt-1">
-                  <AmountDisplay amount={bilanFonctionnel.frng.amount} />
-                </div>
-                <p className="text-xs text-slate-600 mt-2 font-medium">
-                  {bilanFonctionnel.frng.interpretation}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* BFR */}
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-linear-to-br from-amber-50/50 to-white">
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">BFR (Besoin en Fonds de Roulement)</span>
-                <div className="text-2xl font-bold text-amber-950 mt-1">
-                  <AmountDisplay amount={bilanFonctionnel.bfrTotal.amount} />
-                </div>
-                <p className="text-xs text-slate-600 mt-2 font-medium">
-                  {bilanFonctionnel.bfrTotal.interpretation}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Trésorerie Nette */}
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-linear-to-br from-emerald-50/50 to-white">
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Trésorerie Nette (TN)</span>
-                <div className="text-2xl font-bold text-emerald-950 mt-1">
-                  <AmountDisplay amount={bilanFonctionnel.tresorerieNette.amount} />
-                </div>
-                <p className="text-xs text-slate-600 mt-2 font-medium">
-                  {bilanFonctionnel.tresorerieNette.interpretation}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
-            <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
-              <CardTitle className="text-lg font-bold text-slate-900">
-                Structure du Bilan Fonctionnel & Équilibre Fondamental
-              </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
-                Rapprochement certifié de la trésorerie : <strong>Trésorerie Nette = FRNG - BFR = Trésorerie Active - Trésorerie Passive</strong>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Bloc Haut de Bilan */}
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
-                  <h4 className="font-bold text-slate-800 text-sm flex items-center justify-between">
-                    <span>1. Haut de Bilan (Financement Structurel)</span>
-                    <Badge variant="outline" className="text-xs font-mono">FRNG</Badge>
-                  </h4>
-                  <div className="space-y-2 text-sm bg-white p-3 rounded-xl border border-slate-200/60">
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">+ Ressources Stables (RS)</span>
-                      <AmountDisplay amount={bilanFonctionnel.ressourcesStables.amount} className="font-bold" />
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">- Emplois Stables (ES - Actif Brut Immo)</span>
-                      <AmountDisplay amount={bilanFonctionnel.emploisStables.amount} className="font-bold text-rose-600" />
-                    </div>
-                    <div className="border-t pt-2 flex justify-between font-bold text-indigo-900">
-                      <span>= FRNG (Fonds de Roulement)</span>
-                      <AmountDisplay amount={bilanFonctionnel.frng.amount} size="md" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bloc Cycle d'Exploitation (BFR) */}
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
-                  <h4 className="font-bold text-slate-800 text-sm flex items-center justify-between">
-                    <span>2. Cycle d’Exploitation & Hors Exploitation</span>
-                    <Badge variant="outline" className="text-xs font-mono">BFR</Badge>
-                  </h4>
-                  <div className="space-y-2 text-sm bg-white p-3 rounded-xl border border-slate-200/60">
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">+ BFR d’Exploitation (ACE - PCE)</span>
-                      <AmountDisplay amount={bilanFonctionnel.bfrExploitation.amount} className="font-bold" />
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">+ BFR Hors Exploitation (ACHE - PCHE)</span>
-                      <AmountDisplay amount={bilanFonctionnel.bfrHorsExploitation.amount} className="font-bold" />
-                    </div>
-                    <div className="border-t pt-2 flex justify-between font-bold text-amber-900">
-                      <span>= BFR Global</span>
-                      <AmountDisplay amount={bilanFonctionnel.bfrTotal.amount} size="md" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Synthèse de concordance Trésorerie */}
-              <div className="p-5 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
-                <div>
-                  <h5 className="font-bold text-emerald-950 text-sm">Vérification de l’Équation de Trésorerie</h5>
-                  <p className="text-xs text-emerald-800 mt-1">
-                    Trésorerie Active ({bilanFonctionnel.tresorerieNette.tresorerieActive.toFixed(2)} €) - Trésorerie Passive ({bilanFonctionnel.tresorerieNette.tresoreriePassive.toFixed(2)} €) = <strong>{bilanFonctionnel.tresorerieNette.amount.toFixed(2)} €</strong>
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 block">Trésorerie Nette Finale</span>
-                  <AmountDisplay amount={bilanFonctionnel.tresorerieNette.amount} size="xl" className="font-bold text-emerald-900" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ==================================================================== */}
-        {/* ONGLET 5 : SEUIL DE RENTABILITÉ & POINT MORT                          */}
-        {/* ==================================================================== */}
-        <TabsContent value="seuil" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-white">
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Charges Variables</span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
-                  <AmountDisplay amount={seuilRentabilite.chargesVariables} />
-                </div>
-                <p className="text-xs text-slate-500 mt-1">Achats de marchandises et consommations tiers</p>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-white">
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Charges Fixes Structurelles</span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
-                  <AmountDisplay amount={seuilRentabilite.chargesFixes} />
-                </div>
-                <p className="text-xs text-slate-500 mt-1">Salaires, impôts, dotations et intérêts</p>
-              </CardContent>
-            </Card>
-
-            <Card className={cn("rounded-2xl border shadow-xs", seuilRentabilite.atteint ? "bg-emerald-50/70 border-emerald-200" : "bg-rose-50/70 border-rose-200")}>
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Seuil de Rentabilité (CA)</span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
-                  <AmountDisplay amount={seuilRentabilite.seuilCA} />
-                </div>
-                <p className={cn("text-xs font-medium mt-1", seuilRentabilite.atteint ? "text-emerald-700" : "text-rose-700")}>
-                  {seuilRentabilite.atteint ? '✓ Seuil de rentabilité dépassé' : '⚠️ Seuil de rentabilité non atteint'}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
-            <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
-              <CardTitle className="text-lg font-bold text-slate-900">
-                Point Mort & Marge de Sécurité ({selectedYear})
-              </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
-                Indicateurs de risque d'exploitation calculés d'après les SIG réels
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-                  <span className="text-xs font-semibold uppercase text-slate-500">Point Mort en jours</span>
-                  <div className="text-3xl font-bold text-slate-900">
-                    {seuilRentabilite.pointMort.toFixed(0)} jours
-                  </div>
-                  <p className="text-xs text-slate-600">
-                    Nombre de jours d'activité nécessaires pour couvrir l'ensemble des charges fixes de l'année.
-                  </p>
-                </div>
-
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-                  <span className="text-xs font-semibold uppercase text-slate-500">Marge de Sécurité</span>
-                  <div className="text-3xl font-bold text-blue-900">
-                    <AmountDisplay amount={seuilRentabilite.margeSecurite} />
-                  </div>
-                  <p className="text-xs text-slate-600">
-                    Baisse maximale de chiffre d'affaires supportable avant d'entrer en zone de perte ({seuilRentabilite.tauxMargeSecurite.toFixed(1)}% du CA).
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       {/* ==================================================================== */}
@@ -1056,584 +709,6 @@ export default function FinancialStatements() {
                           {acc.credit > 0 ? `${acc.credit.toFixed(2)} €` : '-'}
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono font-bold text-[#1e3a5f]">
-                          {acc.contribution.toFixed(2)} €
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-} 
-            className={cn(
-              "font-mono",
-              isTotal ? "text-lg text-white font-bold" : isSubtotal ? "text-slate-900 font-bold" : "text-slate-800",
-              isNegative && amount > 0 && "text-rose-600"
-            )} 
-          />
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="space-y-8 pb-16">
-      {/* En-tête */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-2 border-b border-slate-200/80">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
-              États Financiers
-            </h1>
-            <Badge variant="outline" className="font-mono text-xs px-2.5 py-1 bg-slate-100/80 text-slate-700 border-slate-300">
-              {planCode} • {planCode === 'SYSCOHADA' ? 'Système Comptable OHADA' : 'Plan Comptable Général Français'}
-            </Badge>
-          </div>
-          <p className="text-slate-500 mt-1 text-sm lg:text-base">
-            Bilan comptable, Soldes Intermédiaires de Gestion et Bilan Fonctionnel calculés à partir de vos comptes
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-xs">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Exercice :</span>
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-28 h-8 font-bold border-0 shadow-none focus:ring-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {availableYears.map(yr => (
-                  <SelectItem key={yr} value={yr} className="font-medium">
-                    {yr}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-
-      {/* Barre d'alerte équilibre comptable */}
-      <div className={cn(
-        "p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs",
-        bilan.isBalanced 
-          ? "bg-emerald-50/70 border-emerald-200 text-emerald-900" 
-          : "bg-amber-50/70 border-amber-200 text-amber-900"
-      )}>
-        <div className="flex items-center gap-3">
-          {bilan.isBalanced ? (
-            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-          ) : (
-            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
-          )}
-          <div>
-            <span className="text-sm font-bold">
-              {bilan.isBalanced ? 'Équilibre comptable parfait (Actif = Passif)' : 'Contrôle d’équilibre à vérifier'}
-            </span>
-            <p className="text-xs text-slate-600 mt-0.5">
-              Total Actif Net : <strong>{bilan.actif.totalNet.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</strong> · 
-              Total Passif : <strong>{bilan.passif.total.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</strong>
-              {!bilan.isBalanced && ` (Écart : ${bilan.ecart.toFixed(2)} €)`}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 self-end sm:self-center">
-          <Badge variant="secondary" className="bg-white/80 border border-slate-200 text-slate-800 text-xs">
-            {yearEntries.length} écritures validées en {selectedYear}
-          </Badge>
-        </div>
-      </div>
-
-      {/* Onglets des États Financiers */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 flex flex-wrap gap-1 h-auto">
-          <TabsTrigger value="sig" className="rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs">
-            <TrendingUp className="h-4 w-4 mr-1.5 text-blue-600" />
-            Soldes Intermédiaires (SIG)
-          </TabsTrigger>
-          <TabsTrigger value="bilan" className="rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs">
-            <Building className="h-4 w-4 mr-1.5 text-purple-600" />
-            Bilan Comptable
-          </TabsTrigger>
-          <TabsTrigger value="fonctionnel" className="rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs">
-            <Scale className="h-4 w-4 mr-1.5 text-emerald-600" />
-            Bilan Fonctionnel & BFR
-          </TabsTrigger>
-          <TabsTrigger value="seuil" className="rounded-xl px-4 py-2 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs">
-            <Target className="h-4 w-4 mr-1.5 text-amber-600" />
-            Seuil de Rentabilité
-          </TabsTrigger>
-        </TabsList>
-
-        {/* ==================================================================== */}
-        {/* ONGLET 1 : SOLDES INTERMÉDIAIRES DE GESTION (SIG)                     */}
-        {/* ==================================================================== */}
-        <TabsContent value="sig" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-linear-to-br from-blue-50/50 to-white">
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Chiffre d’Affaires</span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
-                  <AmountDisplay amount={sig.chiffreAffairesTotal} />
-                </div>
-                <p className="text-xs text-slate-500 mt-1">Ventes de marchandises & prestations</p>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-linear-to-br from-purple-50/50 to-white">
-              <CardContent className="p-5">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Valeur Ajoutée (VA)</span>
-                    <div className="text-2xl font-bold text-purple-950 mt-1">
-                      <AmountDisplay amount={sig.valeurAjoutee.amount} />
-                    </div>
-                  </div>
-                  <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-xs">
-                    {sig.valeurAjoutee.tauxVA.toFixed(1)} % CA
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">Richesse brute créée par l’activité</p>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-linear-to-br from-emerald-50/50 to-white">
-              <CardContent className="p-5">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Résultat Net</span>
-                    <div className="text-2xl font-bold text-emerald-950 mt-1">
-                      <AmountDisplay amount={sig.resultatNet.amount} />
-                    </div>
-                  </div>
-                  <Badge className={cn("text-xs", sig.resultatNet.amount >= 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800")}>
-                    {sig.resultatNet.tauxMargeNette.toFixed(1)} % CA
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">Bénéfice net / Perte de l’exercice</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Tableau détaillé des étapes des SIG avec Drill-down */}
-          <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
-            <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
-              <div>
-                <CardTitle className="text-lg font-bold text-slate-900">
-                  Soldes Intermédiaires de Gestion ({selectedYear})
-                </CardTitle>
-                <CardDescription className="text-xs text-slate-500">
-                  Décomposition réglementaire du compte de résultat. Cliquez sur l’icône ℹ️ pour inspecter chaque compte contributeur.
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 space-y-4">
-              {/* Étape 1 : Marge Commerciale */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">1. Activité Commerciale</div>
-                <FinancialRow label="Ventes de marchandises (707)" amount={sig.margeCommerciale.ventes.amount} aggregateItem={sig.margeCommerciale.ventes} level={1} />
-                <FinancialRow label="- Achats de marchandises & variation stock (607, 6037)" amount={sig.margeCommerciale.achats.amount} aggregateItem={sig.margeCommerciale.achats} isNegative level={1} />
-                <FinancialRow label="= Marge Commerciale" amount={sig.margeCommerciale.amount} isSubtotal badge={`Taux : ${sig.margeCommerciale.taux}%`} />
-              </div>
-
-              {/* Étape 2 : Production de l'exercice */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">2. Activité de Production</div>
-                <FinancialRow label="Production vendue (Biens & Services 701-706)" amount={sig.productionExercice.productionVendue.amount} aggregateItem={sig.productionExercice.productionVendue} level={1} />
-                <FinancialRow label="Production stockée & immobilisée (71, 72)" amount={sig.productionExercice.productionStockeeImmobilisee.amount} aggregateItem={sig.productionExercice.productionStockeeImmobilisee} level={1} />
-                <FinancialRow label="= Production de l’exercice" amount={sig.productionExercice.amount} isSubtotal />
-              </div>
-
-              {/* Étape 3 : Valeur Ajoutée */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">3. Création de Valeur</div>
-                <FinancialRow label="- Consommations en provenance des tiers (601-606, 61, 62)" amount={sig.valeurAjoutee.consommationsTiers.amount} aggregateItem={sig.valeurAjoutee.consommationsTiers} isNegative level={1} />
-                <FinancialRow label="= Valeur Ajoutée (VA)" amount={sig.valeurAjoutee.amount} isSubtotal badge={`Taux : ${sig.valeurAjoutee.tauxVA}%`} />
-              </div>
-
-              {/* Étape 4 : Excédent Brut d'Exploitation */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">4. Performance d’Exploitation Brute</div>
-                <FinancialRow label="+ Subventions d’exploitation (74)" amount={sig.ebe.subventionsExploitation.amount} aggregateItem={sig.ebe.subventionsExploitation} level={1} />
-                <FinancialRow label="- Impôts, taxes et versements assimilés (63)" amount={sig.ebe.impotsTaxes.amount} aggregateItem={sig.ebe.impotsTaxes} isNegative level={1} />
-                <FinancialRow label="- Charges de personnel (Salaires & Charges 64)" amount={sig.ebe.chargesPersonnel.amount} aggregateItem={sig.ebe.chargesPersonnel} isNegative level={1} />
-                <FinancialRow label="= Excédent Brut d’Exploitation (EBE)" amount={sig.ebe.amount} isSubtotal badge={`Taux : ${sig.ebe.tauxEBE}%`} />
-              </div>
-
-              {/* Étape 5 : Résultat d'Exploitation */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">5. Résultat d’Exploitation Net</div>
-                <FinancialRow label="+ Autres produits d’exploitation & reprises (75, 781, 791)" amount={sig.rex.autresProduitsExploitation.amount} aggregateItem={sig.rex.autresProduitsExploitation} level={1} />
-                <FinancialRow label="- Autres charges de gestion courante (65)" amount={sig.rex.autresChargesExploitation.amount} aggregateItem={sig.rex.autresChargesExploitation} isNegative level={1} />
-                <FinancialRow label="- Dotations aux amortissements et provisions (681)" amount={sig.rex.dotationsAmortissements.amount} aggregateItem={sig.rex.dotationsAmortissements} isNegative level={1} />
-                <FinancialRow label="= Résultat d’Exploitation (REX)" amount={sig.rex.amount} isSubtotal />
-              </div>
-
-              {/* Étape 6 & 7 : Résultat Financier et RCAI */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">6. Activité Financière & RCAI</div>
-                <FinancialRow label="+ Produits financiers (76, 786, 796)" amount={sig.rcai.produitsFinanciers.amount} aggregateItem={sig.rcai.produitsFinanciers} level={1} />
-                <FinancialRow label="- Charges financières (66, 686)" amount={sig.rcai.chargesFinancieres.amount} aggregateItem={sig.rcai.chargesFinancieres} isNegative level={1} />
-                <FinancialRow label="= Résultat Courant Avant Impôts (RCAI)" amount={sig.rcai.amount} isSubtotal />
-              </div>
-
-              {/* Étape 8 : Exceptionnel / HAO et Résultat Net */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-2xs">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-2">7. Exceptionnel, Impôts & Résultat Final</div>
-                <FinancialRow label="+ Produits exceptionnels / HAO" amount={sig.resultatExceptionnel.produitsExceptionnels.amount} aggregateItem={sig.resultatExceptionnel.produitsExceptionnels} level={1} />
-                <FinancialRow label="- Charges exceptionnelles / HAO" amount={sig.resultatExceptionnel.chargesExceptionnelles.amount} aggregateItem={sig.resultatExceptionnel.chargesExceptionnelles} isNegative level={1} />
-                <FinancialRow label="- Impôt sur les sociétés & Participation (69)" amount={sig.resultatNet.impotsBenefices.amount} aggregateItem={sig.resultatNet.impotsBenefices} isNegative level={1} />
-                <FinancialRow label="= RÉSULTAT NET DE L’EXERCICE" amount={sig.resultatNet.amount} isTotal />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ==================================================================== */}
-        {/* ONGLET 2 : BILAN COMPTABLE NORMALISÉ                                   */}
-        {/* ==================================================================== */}
-        <TabsContent value="bilan" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* ACTIF */}
-            <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
-              <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-blue-600" />
-                    <CardTitle className="text-base font-bold text-slate-900">ACTIF (Emplois)</CardTitle>
-                  </div>
-                  <span className="text-xs font-semibold text-slate-500">Valeur Nette</span>
-                </div>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-5 space-y-4">
-                {/* Actif Immobilisé */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-3">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Actif Immobilisé (Cl. 2)</div>
-                  <FinancialRow label="Immobilisations incorporelles (20)" amount={bilan.actif.actifImmobilise.incorporelles.amount} aggregateItem={bilan.actif.actifImmobilise.incorporelles} level={1} />
-                  <FinancialRow label="Immobilisations corporelles (21-23)" amount={bilan.actif.actifImmobilise.corporelles.amount} aggregateItem={bilan.actif.actifImmobilise.corporelles} level={1} />
-                  <FinancialRow label="Immobilisations financières (26, 27)" amount={bilan.actif.actifImmobilise.financieres.amount} aggregateItem={bilan.actif.actifImmobilise.financieres} level={1} />
-                  <FinancialRow label="- Amortissements & Dépréciations (28, 29)" amount={bilan.actif.actifImmobilise.amortissements.amount} aggregateItem={bilan.actif.actifImmobilise.amortissements} isNegative level={1} />
-                  <FinancialRow label="Total Actif Immobilisé Net" amount={bilan.actif.actifImmobilise.totalNet} isSubtotal />
-                </div>
-
-                {/* Actif Circulant */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-3">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Actif Circulant (Cl. 3, 4, 5)</div>
-                  <FinancialRow label="Stocks & en-cours nets (Classe 3)" amount={bilan.actif.actifCirculant.stocks.totalNet} aggregateItem={bilan.actif.actifCirculant.stocks.brut} level={1} />
-                  <FinancialRow label="Créances clients & comptes rattachés (411)" amount={bilan.actif.actifCirculant.creancesClients.totalNet} aggregateItem={bilan.actif.actifCirculant.creancesClients.brut} level={1} />
-                  <FinancialRow label="Autres créances & acomptes (409, 4456, 467)" amount={bilan.actif.actifCirculant.autresCreances.amount} aggregateItem={bilan.actif.actifCirculant.autresCreances} level={1} />
-                  <FinancialRow label="Disponibilités & Banque (512, 53, 50)" amount={bilan.actif.actifCirculant.tresorerieActive.amount} aggregateItem={bilan.actif.actifCirculant.tresorerieActive} level={1} />
-                  <FinancialRow label="Total Actif Circulant Net" amount={bilan.actif.actifCirculant.totalNet} isSubtotal />
-                </div>
-
-                <FinancialRow label="TOTAL GÉNÉRAL DE L’ACTIF" amount={bilan.actif.totalNet} isTotal />
-              </CardContent>
-            </Card>
-
-            {/* PASSIF */}
-            <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
-              <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-purple-600" />
-                    <CardTitle className="text-base font-bold text-slate-900">PASSIF (Ressources)</CardTitle>
-                  </div>
-                  <span className="text-xs font-semibold text-slate-500">Montant</span>
-                </div>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-5 space-y-4">
-                {/* Capitaux Propres */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-3">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Capitaux Propres (Cl. 1)</div>
-                  <FinancialRow label="Capital, réserves, report à nouveau (10, 11)" amount={bilan.passif.capitauxPropres.capitalReserves.amount} aggregateItem={bilan.passif.capitauxPropres.capitalReserves} level={1} />
-                  <FinancialRow label="Résultat net de l’exercice (calculé)" amount={bilan.passif.capitauxPropres.resultatNetExercice} level={1} badge="Dynamique" />
-                  <FinancialRow label="Total Capitaux Propres" amount={bilan.passif.capitauxPropres.total} isSubtotal />
-                </div>
-
-                {/* Dettes */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-3">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Dettes & Engagements (Cl. 1, 4, 5)</div>
-                  <FinancialRow label="Emprunts et dettes financières LMT (16, 17)" amount={bilan.passif.dettesFinancieresStables.amount} aggregateItem={bilan.passif.dettesFinancieresStables} level={1} />
-                  <FinancialRow label="Dettes fournisseurs & comptes rattachés (401)" amount={bilan.passif.dettesExploitation.fournisseurs.amount} aggregateItem={bilan.passif.dettesExploitation.fournisseurs} level={1} />
-                  <FinancialRow label="Dettes fiscales et sociales (42, 43, 4457)" amount={bilan.passif.dettesExploitation.fiscalesSociales.amount} aggregateItem={bilan.passif.dettesExploitation.fiscalesSociales} level={1} />
-                  <FinancialRow label="Autres dettes & acomptes reçus (419, 455, 467)" amount={bilan.passif.autresDettesPassif.amount} aggregateItem={bilan.passif.autresDettesPassif} level={1} />
-                  <FinancialRow label="Concours bancaires courants / Découverts (519)" amount={bilan.passif.tresoreriePassive.amount} aggregateItem={bilan.passif.tresoreriePassive} level={1} />
-                  <FinancialRow label="Total Dettes" amount={bilan.passif.total - bilan.passif.capitauxPropres.total} isSubtotal />
-                </div>
-
-                <FinancialRow label="TOTAL GÉNÉRAL DU PASSIF" amount={bilan.passif.total} isTotal />
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* ==================================================================== */}
-        {/* ONGLET 3 : BILAN FONCTIONNEL, FRNG, BFR & TRÉSORERIE NETTE            */}
-        {/* ==================================================================== */}
-        <TabsContent value="fonctionnel" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* FRNG */}
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-linear-to-br from-indigo-50/50 to-white">
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">FRNG (Fonds de Roulement)</span>
-                <div className="text-2xl font-bold text-indigo-950 mt-1">
-                  <AmountDisplay amount={bilanFonctionnel.frng.amount} />
-                </div>
-                <p className="text-xs text-slate-600 mt-2 font-medium">
-                  {bilanFonctionnel.frng.interpretation}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* BFR */}
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-linear-to-br from-amber-50/50 to-white">
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">BFR (Besoin en Fonds de Roulement)</span>
-                <div className="text-2xl font-bold text-amber-950 mt-1">
-                  <AmountDisplay amount={bilanFonctionnel.bfrTotal.amount} />
-                </div>
-                <p className="text-xs text-slate-600 mt-2 font-medium">
-                  {bilanFonctionnel.bfrTotal.interpretation}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Trésorerie Nette */}
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-linear-to-br from-emerald-50/50 to-white">
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Trésorerie Nette (TN)</span>
-                <div className="text-2xl font-bold text-emerald-950 mt-1">
-                  <AmountDisplay amount={bilanFonctionnel.tresorerieNette.amount} />
-                </div>
-                <p className="text-xs text-slate-600 mt-2 font-medium">
-                  {bilanFonctionnel.tresorerieNette.interpretation}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
-            <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
-              <CardTitle className="text-lg font-bold text-slate-900">
-                Structure du Bilan Fonctionnel & Équilibre Fondamental
-              </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
-                Rapprochement certifié de la trésorerie : <strong>Trésorerie Nette = FRNG - BFR = Trésorerie Active - Trésorerie Passive</strong>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Bloc Haut de Bilan */}
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
-                  <h4 className="font-bold text-slate-800 text-sm flex items-center justify-between">
-                    <span>1. Haut de Bilan (Financement Structurel)</span>
-                    <Badge variant="outline" className="text-xs font-mono">FRNG</Badge>
-                  </h4>
-                  <div className="space-y-2 text-sm bg-white p-3 rounded-xl border border-slate-200/60">
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">+ Ressources Stables (RS)</span>
-                      <AmountDisplay amount={bilanFonctionnel.ressourcesStables.amount} className="font-bold" />
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">- Emplois Stables (ES - Actif Brut Immo)</span>
-                      <AmountDisplay amount={bilanFonctionnel.emploisStables.amount} className="font-bold text-rose-600" />
-                    </div>
-                    <div className="border-t pt-2 flex justify-between font-bold text-indigo-900">
-                      <span>= FRNG (Fonds de Roulement)</span>
-                      <AmountDisplay amount={bilanFonctionnel.frng.amount} size="md" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bloc Cycle d'Exploitation (BFR) */}
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
-                  <h4 className="font-bold text-slate-800 text-sm flex items-center justify-between">
-                    <span>2. Cycle d’Exploitation & Hors Exploitation</span>
-                    <Badge variant="outline" className="text-xs font-mono">BFR</Badge>
-                  </h4>
-                  <div className="space-y-2 text-sm bg-white p-3 rounded-xl border border-slate-200/60">
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">+ BFR d’Exploitation (ACE - PCE)</span>
-                      <AmountDisplay amount={bilanFonctionnel.bfrExploitation.amount} className="font-bold" />
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">+ BFR Hors Exploitation (ACHE - PCHE)</span>
-                      <AmountDisplay amount={bilanFonctionnel.bfrHorsExploitation.amount} className="font-bold" />
-                    </div>
-                    <div className="border-t pt-2 flex justify-between font-bold text-amber-900">
-                      <span>= BFR Global</span>
-                      <AmountDisplay amount={bilanFonctionnel.bfrTotal.amount} size="md" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Synthèse de concordance Trésorerie */}
-              <div className="p-5 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
-                <div>
-                  <h5 className="font-bold text-emerald-950 text-sm">Vérification de l’Équation de Trésorerie</h5>
-                  <p className="text-xs text-emerald-800 mt-1">
-                    Trésorerie Active ({bilanFonctionnel.tresorerieNette.tresorerieActive.toFixed(2)} €) - Trésorerie Passive ({bilanFonctionnel.tresorerieNette.tresoreriePassive.toFixed(2)} €) = <strong>{bilanFonctionnel.tresorerieNette.amount.toFixed(2)} €</strong>
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 block">Trésorerie Nette Finale</span>
-                  <AmountDisplay amount={bilanFonctionnel.tresorerieNette.amount} size="xl" className="font-bold text-emerald-900" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ==================================================================== */}
-        {/* ONGLET 4 : SEUIL DE RENTABILITÉ & POINT MORT                          */}
-        {/* ==================================================================== */}
-        <TabsContent value="seuil" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-white">
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Charges Variables</span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
-                  <AmountDisplay amount={seuilRentabilite.chargesVariables} />
-                </div>
-                <p className="text-xs text-slate-500 mt-1">Achats de marchandises et consommations tiers</p>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-2xl border-slate-200/90 shadow-xs bg-white">
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Charges Fixes Structurelles</span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
-                  <AmountDisplay amount={seuilRentabilite.chargesFixes} />
-                </div>
-                <p className="text-xs text-slate-500 mt-1">Salaires, impôts, dotations et intérêts</p>
-              </CardContent>
-            </Card>
-
-            <Card className={cn("rounded-2xl border shadow-xs", seuilRentabilite.atteint ? "bg-emerald-50/70 border-emerald-200" : "bg-rose-50/70 border-rose-200")}>
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Seuil de Rentabilité (CA)</span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
-                  <AmountDisplay amount={seuilRentabilite.seuilCA} />
-                </div>
-                <p className={cn("text-xs font-medium mt-1", seuilRentabilite.atteint ? "text-emerald-700" : "text-rose-700")}>
-                  {seuilRentabilite.atteint ? '✓ Seuil de rentabilité dépassé' : '⚠️ Seuil de rentabilité non atteint'}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
-            <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
-              <CardTitle className="text-lg font-bold text-slate-900">
-                Point Mort & Marge de Sécurité ({selectedYear})
-              </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
-                Indicateurs de risque d'exploitation calculés d'après les SIG réels
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-                  <span className="text-xs font-semibold uppercase text-slate-500">Point Mort en jours</span>
-                  <div className="text-3xl font-bold text-slate-900">
-                    {seuilRentabilite.pointMort.toFixed(0)} jours
-                  </div>
-                  <p className="text-xs text-slate-600">
-                    Nombre de jours d'activité nécessaires pour couvrir l'ensemble des charges fixes de l'année.
-                  </p>
-                </div>
-
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-                  <span className="text-xs font-semibold uppercase text-slate-500">Marge de Sécurité</span>
-                  <div className="text-3xl font-bold text-blue-900">
-                    <AmountDisplay amount={seuilRentabilite.margeSecurite} />
-                  </div>
-                  <p className="text-xs text-slate-600">
-                    Baisse maximale de chiffre d'affaires supportable avant d'entrer en zone de perte ({seuilRentabilite.tauxMargeSecurite.toFixed(1)}% du CA).
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* ==================================================================== */}
-      {/* MODAL DRILL-DOWN : EXPLICATION ET DÉTAIL DES COMPTES POUR UN POSTE    */}
-      {/* ==================================================================== */}
-      <Dialog open={!!selectedDrillDown} onOpenChange={() => setSelectedDrillDown(null)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-[#1e3a5f]" />
-              <DialogTitle className="text-lg font-bold text-slate-900">
-                {selectedDrillDown?.label}
-              </DialogTitle>
-            </div>
-            <DialogDescription className="text-xs text-slate-500 pt-1">
-              Règle comptable : {selectedDrillDown?.ruleDescription}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 pt-3">
-            {/* Synthèse du poste */}
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200/80">
-              <div>
-                <span className="text-xs font-semibold uppercase text-slate-500">Montant net calculé</span>
-                <div className="text-xl font-bold text-slate-900">
-                  <AmountDisplay amount={selectedDrillDown?.amount || 0} />
-                </div>
-              </div>
-              <Badge variant="secondary" className="font-mono text-xs">
-                {selectedDrillDown?.accounts?.length || 0} compte(s) mouvementé(s)
-              </Badge>
-            </div>
-
-            {/* Liste des comptes contributeurs avec débits, crédits et solde */}
-            {(!selectedDrillDown?.accounts || selectedDrillDown.accounts.length === 0) ? (
-              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200/80 text-slate-500 text-xs">
-                Aucun compte de ce poste n'a fait l'objet de mouvement sur l'exercice {selectedYear}.
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-slate-200/90 overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100/90 text-slate-600 font-bold uppercase border-b border-slate-200">
-                    <tr>
-                      <th className="py-2.5 px-3 font-mono">Compte</th>
-                      <th className="py-2.5 px-3">Libellé</th>
-                      <th className="py-2.5 px-3 text-right">Débit</th>
-                      <th className="py-2.5 px-3 text-right">Crédit</th>
-                      <th className="py-2.5 px-3 text-right font-bold">Contribution</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {selectedDrillDown.accounts.map((acc) => (
-                      <tr key={acc.code} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
-                          {acc.code}
-                        </td>
-                        <td className="py-2.5 px-3 font-medium text-slate-700">
-                          {acc.label}
-                          {acc.parent_code && (
-                            <span className="block text-[10px] text-slate-400 font-mono">
-                              (Racine {acc.parent_code})
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono text-slate-600">
-                          {acc.debit > 0 ? `${acc.debit.toFixed(2)} €` : '-'}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono text-slate-600">
-                          {acc.credit > 0 ? `${acc.credit.toFixed(2)} €` : '-'}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
                           {acc.contribution.toFixed(2)} €
                         </td>
                       </tr>

@@ -3,13 +3,6 @@ import {
   Calculator, 
   Save, 
   TrendingUp, 
-  Layers, 
-  Activity, 
-  CheckCircle2, 
-  AlertCircle, 
-  Percent, 
-  ArrowRight,
-  HelpCircle,
   FileText,
   Info
 } from 'lucide-react';
@@ -670,5 +663,4 @@ export default function Costing() {
       </div>
     </ProtectedRoute>
   );
-} className="text-sm text-slate-500">Coût unitaire</p><p className="text-xl font-semibold">{result.unitCost.toLocaleString('fr-FR')} €</p></div>{result.variance !== null && <div><p className="text-sm text-slate-500">Écart au standard</p><p className={result.variance > 0 ? 'font-semibold text-rose-600' : 'font-semibold text-emerald-600'}>{result.variance.toLocaleString('fr-FR')} €</p></div>}</CardContent></Card></div></div></ProtectedRoute>;
 }

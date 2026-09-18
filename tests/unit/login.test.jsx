@@ -21,14 +21,9 @@ describe('parcours de connexion', () => {
     expect(screen.getByRole('heading', { name: 'Connexion' })).toBeInTheDocument();
   });
 
-  it('bloque une confirmation de mot de passe incoherente avant le reseau', async () => {
+  it('n’expose pas de formulaire d’auto-inscription (compte cree par un administrateur)', () => {
     render(<Login />);
-    fireEvent.click(screen.getByRole('button', { name: 'Créer un compte' }));
-    fireEvent.change(screen.getByLabelText('Adresse e-mail'), { target: { value: 'test@example.com' } });
-    fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'secret' } });
-    fireEvent.change(screen.getByLabelText('Confirmer le mot de passe'), { target: { value: 'different' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Créer mon compte' }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Les mots de passe ne correspondent pas');
+    expect(screen.queryByRole('button', { name: 'Créer un compte' })).not.toBeInTheDocument();
+    expect(screen.getByText('Pas encore de compte ? Contactez votre administrateur.')).toBeInTheDocument();
   });
 });

@@ -24,11 +24,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, AlertTriangle, Package } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, Package, ShieldAlert } from 'lucide-react';
 import AmountDisplay from '@/components/common/AmountDisplay';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { buildStockImpairmentEntries, buildStockMovementEntries, stockValuation } from '@/lib/auxiliaryAccounting';
+import { usePagination } from '@/components/common/usePagination';
+import PaginationBar from '@/components/common/PaginationBar';
+import { buildStockImpairmentEntries, buildStockMovementEntries, stockDormancyRate, stockValuation } from '@/lib/auxiliaryAccounting';
 
 export default function StockManagement() {
   const { user } = useUser();
@@ -51,6 +53,16 @@ export default function StockManagement() {
     queryKey: ['stock-impairments', user?.active_company_id],
     queryFn: async () => {
       const { data, error } = await supabase.from('stock_impairments').select('*').eq('company_id', user.active_company_id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.active_company_id,
+  });
+
+  const { data: movements = [] } = useQuery({
+    queryKey: ['stock-movements', user?.active_company_id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('stock_movements').select('stock_item_id, movement_date').eq('company_id', user.active_company_id);
       if (error) throw error;
       return data;
     },
@@ -118,6 +130,55 @@ export default function StockManagement() {
     },
   });
 
+  // Détecte les stocks sans mouvement depuis 6/12/24 mois et provisionne une dépréciation suggestive en brouillon.
+  const dormancyMutation = useMutation({
+    mutationFn: async () => {
+      const today = new Date();
+      const lastMovementByItem = new Map();
+      movements.forEach((movement) => {
+        const date = new Date(movement.movement_date);
+        const current = lastMovementByItem.get(movement.stock_item_id);
+        if (!current || date > current) lastMovementByItem.set(movement.stock_item_id, date);
+      });
+
+      const provisioned = [];
+      for (const stock of stocks) {
+        if (!(stock.quantity > 0)) continue;
+        const lastMovement = lastMovementByItem.get(stock.id) || new Date(stock.created_at);
+        const daysSince = Math.floor((today - lastMovement) / 86_400_000);
+        const rate = stockDormancyRate(daysSince);
+        if (rate <= 0) continue;
+        if (impairments.some((item) => item.stock_item_id === stock.id)) continue;
+
+        const values = stockValuation(stock, stock.unit_price * (1 - rate));
+        if (values.impairment <= 0) continue;
+        const assessmentDate = today.toISOString().slice(0, 10);
+        const entry = buildStockImpairmentEntries(stock, { impairment: values.impairment, assessment_date: assessmentDate }, user.active_company_id);
+        const { data: created, error: insertError } = await supabase.from('stock_impairments').insert({
+          company_id: user.active_company_id,
+          stock_item_id: stock.id,
+          assessment_date: assessmentDate,
+          book_value: values.bookValue,
+          recoverable_value: values.recoverableValue,
+          notes: `Détection automatique : aucun mouvement depuis ${daysSince} jours`,
+        }).select().single();
+        if (insertError) throw insertError;
+        const { error: entryError } = await supabase.from('accounting_entries').insert(entry);
+        if (entryError) throw entryError;
+        const { error: updateError } = await supabase.from('stock_impairments').update({ is_posted: true, accounting_entry_number: entry[0].entry_number }).eq('id', created.id).eq('company_id', user.active_company_id);
+        if (updateError) throw updateError;
+        provisioned.push(stock.product_name);
+      }
+      return provisioned;
+    },
+    onSuccess: (provisioned) => {
+      queryClient.invalidateQueries({ queryKey: ['stock-impairments', user.active_company_id] });
+      queryClient.invalidateQueries({ queryKey: ['entries', user.active_company_id] });
+      toast.success(provisioned.length ? `${provisioned.length} dépréciation(s) de stock dormant générée(s) en brouillon` : 'Aucun stock dormant à provisionner');
+    },
+    onError: (error) => toast.error(error.message || 'Impossible de détecter les stocks dormants'),
+  });
+
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => { const { error } = await supabase.from('stock_items').update(data).eq('id', id).eq('company_id', user.active_company_id); if (error) throw error; },
     onSuccess: () => {
@@ -151,6 +212,8 @@ export default function StockManagement() {
     s.product_code?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const { paginatedItems: pagedStocks, currentPage, totalPages, totalItems, goToPrevious, goToNext } = usePagination(filteredStocks, 12);
+
   const handleSubmit = (formData) => {
     const data = {
       ...formData,
@@ -170,10 +233,16 @@ export default function StockManagement() {
         title="Gestion des Stocks"
         subtitle="Suivi des produits et inventaire"
         actions={
-          <Button onClick={() => { setEditingStock(null); setShowForm(true); }} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nouveau produit
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" className="gap-2" disabled={dormancyMutation.isPending} onClick={() => dormancyMutation.mutate()}>
+              <ShieldAlert className="h-4 w-4" />
+              Détecter les stocks dormants
+            </Button>
+            <Button onClick={() => { setEditingStock(null); setShowForm(true); }} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nouveau produit
+            </Button>
+          </div>
         }
       />
 
@@ -234,7 +303,7 @@ export default function StockManagement() {
 
       {/* Liste des stocks */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredStocks.map(stock => {
+        {pagedStocks.map(stock => {
           const isLowStock = (stock.min_quantity || 0) > 0 && stock.quantity <= stock.min_quantity;
           const totalValue = (stock.quantity || 0) * (stock.unit_price || 0);
           const stockImpairments = impairments.filter((impairment) => impairment.stock_item_id === stock.id);
@@ -331,6 +400,8 @@ export default function StockManagement() {
           );
         })}
       </div>
+
+      <PaginationBar currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} pageSize={12} onPrevious={goToPrevious} onNext={goToNext} />
 
       {/* Formulaire */}
       <StockForm

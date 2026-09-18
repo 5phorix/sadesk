@@ -355,7 +355,7 @@ export default function Invoices() {
           <>
             <Button
               onClick={handleNewInvoice}
-              className="gap-2 bg-gradient-to-r from-[#1e3a5f] to-[#2d4a6f] hover:opacity-90"
+              className="gap-2 bg-[#142638] hover:bg-[#24445a] rounded-lg"
             >
               <Plus className="h-4 w-4" />
               Nouvelle facture
@@ -365,7 +365,7 @@ export default function Invoices() {
       />
 
       {/* Filtres */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6 mb-6">
+      <div className="workspace-surface rounded-xl p-5 mb-6">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
             <div className="relative">
@@ -374,7 +374,7 @@ export default function Invoices() {
                 placeholder="Rechercher une facture..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-white/75 border-[#e2e8f0] rounded-lg"
               />
             </div>
           </div>

@@ -47,6 +47,37 @@ export function receivableReminder(invoice, today = new Date(), thresholds = [7,
   return level > 0 ? { daysLate, level } : null;
 }
 
+/** Barème de provision pour créances douteuses selon l'ancienneté du retard. */
+export function receivableProvisionRate(daysLate) {
+  const days = toNumber(daysLate);
+  if (days >= 180) return 1;
+  if (days >= 90) return 0.5;
+  if (days >= 60) return 0.25;
+  return 0;
+}
+
+/** Prépare l'écriture de provision pour dépréciation d'une créance douteuse. */
+export function buildReceivableProvisionEntries(invoice, provisionAmount, companyId, today = new Date()) {
+  const amount = round2(provisionAmount);
+  if (amount <= 0) return [];
+  const date = (today instanceof Date ? today : new Date(today)).toISOString().slice(0, 10);
+  const entryNumber = `OD-PROV-CLI-${invoice.invoice_number}`;
+  const label = `Provision créance douteuse ${invoice.third_party_name || invoice.invoice_number}`;
+  return [
+    { account_code: '681174', account_label: 'Dotations aux dépréciations des comptes clients', debit: amount, credit: 0 },
+    { account_code: '491000', account_label: 'Dépréciations des comptes clients', debit: 0, credit: amount },
+  ].map((entry) => ({
+    ...entry,
+    company_id: companyId,
+    entry_number: entryNumber,
+    date,
+    journal: 'OD',
+    label,
+    reference: invoice.invoice_number,
+    is_validated: false,
+  }));
+}
+
 /** Dotation linéaire mensuelle, plafonnée à la valeur amortissable restante. */
 export function straightLineDepreciation(asset, periodStart, periodEnd) {
   const cost = round2(asset.acquisition_cost);
@@ -86,6 +117,30 @@ export function buildDepreciationPlan(asset) {
       amount: result.amount,
     };
   }).filter((period) => period.amount > 0);
+}
+
+/**
+ * Dotation à comptabiliser pour un exercice donné, avec prorata automatique
+ * à l'entrée en service et à la sortie (les mois hors service ne sont pas comptés).
+ */
+export function computeYearlyDepreciation(asset, year) {
+  const disposalDate = asset.disposal_date ? new Date(asset.disposal_date) : null;
+  const periodsInYear = buildDepreciationPlan(asset).filter((period) => {
+    if (new Date(period.period_end).getFullYear() !== Number(year)) return false;
+    if (disposalDate && new Date(period.period_end) > disposalDate) return false;
+    return true;
+  });
+  if (!periodsInYear.length) return null;
+
+  const amount = round2(periodsInYear.reduce((sum, period) => sum + period.amount, 0));
+  if (amount <= 0) return null;
+
+  return {
+    period_start: periodsInYear[0].period_start,
+    period_end: periodsInYear[periodsInYear.length - 1].period_end,
+    amount,
+    months: periodsInYear.length,
+  };
 }
 
 /** Prépare les deux lignes équilibrées d'une dotation non encore comptabilisée. */
@@ -212,6 +267,15 @@ export function stockValuation(stockItem, recoverableUnitValue = null) {
     recoverableValue,
     impairment: round2(Math.max(bookValue - recoverableValue, 0)),
   };
+}
+
+/** Taux de dépréciation suggéré pour un stock dormant selon l'ancienneté du dernier mouvement. */
+export function stockDormancyRate(daysSinceLastMovement) {
+  const days = toNumber(daysSinceLastMovement);
+  if (days >= 730) return 1;
+  if (days >= 365) return 0.5;
+  if (days >= 180) return 0.3;
+  return 0;
 }
 
 /** Prépare l'écriture de variation de stock d'un mouvement valorisé. */

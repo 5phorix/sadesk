@@ -135,26 +135,26 @@ export default function BankReconciliation() {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
+          <Card className="border-[#e2e8f0] bg-white/70 shadow-sm">
+            <CardContent className="pt-5">
               <div className="text-sm text-slate-500 mb-1">Total transactions</div>
               <div className="text-2xl font-bold text-slate-800">{stats.total}</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-6">
+          <Card className="border-[#e2e8f0] bg-white/70 shadow-sm">
+            <CardContent className="pt-5">
               <div className="text-sm text-slate-500 mb-1">Rapprochées</div>
               <div className="text-2xl font-bold text-emerald-600">{stats.reconciled}</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-6">
+          <Card className="border-[#e2e8f0] bg-white/70 shadow-sm">
+            <CardContent className="pt-5">
               <div className="text-sm text-slate-500 mb-1">Non rapprochées</div>
               <div className="text-2xl font-bold text-orange-600">{stats.unreconciled}</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-6">
+          <Card className="border-[#e2e8f0] bg-white/70 shadow-sm">
+            <CardContent className="pt-5">
               <div className="text-sm text-slate-500 mb-1">Solde rapproché</div>
               <AmountDisplay amount={stats.reconciledBalance} size="lg" showSign />
             </CardContent>
@@ -162,7 +162,7 @@ export default function BankReconciliation() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
+          <TabsList className="rounded-lg border border-[#e2e8f0] bg-[#f1f5f9] p-1">
             <TabsTrigger value="transactions">Transactions bancaires</TabsTrigger>
             <TabsTrigger value="reconciliation">Rapprochement</TabsTrigger>
             <TabsTrigger value="import">Importer relevé</TabsTrigger>
@@ -193,23 +193,23 @@ export default function BankReconciliation() {
               </Button>
             </div>
 
-            <Card>
+            <Card className="border-[#e2e8f0] bg-white/70 shadow-sm overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-slate-50 border-b border-slate-200">
+                  <table className="w-full min-w-[760px]">
+                    <thead className="bg-[#f1f5f9]/70 border-b border-[#e2e8f0]">
                       <tr>
-                        <th className="text-left p-3 text-sm font-semibold text-slate-600">Date</th>
-                        <th className="text-left p-3 text-sm font-semibold text-slate-600">Description</th>
-                        <th className="text-left p-3 text-sm font-semibold text-slate-600">Référence</th>
-                        <th className="text-right p-3 text-sm font-semibold text-slate-600">Montant</th>
-                        <th className="text-center p-3 text-sm font-semibold text-slate-600">Statut</th>
+                        <th className="text-left p-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[#475569]">Date</th>
+                        <th className="text-left p-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[#475569]">Description</th>
+                        <th className="text-left p-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[#475569]">Référence</th>
+                        <th className="text-right p-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[#475569]">Montant</th>
+                        <th className="text-center p-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[#475569]">Statut</th>
                         <th className="text-right p-3 text-sm font-semibold text-slate-600" />
                       </tr>
                     </thead>
                     <tbody>
                       {filteredTransactions.map((transaction) => (
-                        <tr key={transaction.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <tr key={transaction.id} className="border-b border-[#f1f5f9] hover:bg-[#f8fafc]">
                           <td className="p-3 text-sm text-slate-600">
                             {format(parseISO(transaction.transaction_date), 'dd/MM/yyyy')}
                           </td>

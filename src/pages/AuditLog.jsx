@@ -17,6 +17,8 @@ import {
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { ChevronDown, ChevronRight, History, Search } from 'lucide-react';
+import { usePagination } from '@/components/common/usePagination';
+import PaginationBar from '@/components/common/PaginationBar';
 
 const ACTION_STYLES = {
   insert: { label: 'Création', className: 'bg-emerald-100 text-emerald-800' },
@@ -120,6 +122,8 @@ export default function AuditLog() {
     });
   }, [logs, search, entityType, action]);
 
+  const { paginatedItems: pagedLogs, currentPage, totalPages, totalItems, goToPrevious, goToNext } = usePagination(filtered, 15);
+
   return (
     <ProtectedRoute permission="audit:read">
       <div>
@@ -180,7 +184,7 @@ export default function AuditLog() {
               </div>
             ) : (
               <div className="space-y-1">
-                {filtered.map((log) => {
+                {pagedLogs.map((log) => {
                   const style = ACTION_STYLES[log.action];
                   const isOpen = expanded === log.id;
 
@@ -226,6 +230,7 @@ export default function AuditLog() {
               </div>
             )}
           </CardContent>
+          <PaginationBar currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} pageSize={15} onPrevious={goToPrevious} onNext={goToNext} />
         </Card>
 
         {logs.length >= 500 && (

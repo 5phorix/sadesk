@@ -2,6 +2,19 @@
 
 Cette checklist couvre les éléments restant à traiter avant de déclarer Sadesk Compta opérationnel en production.
 
+## Validation locale au 15 septembre 2026
+
+- [x] `npm run lint` passe.
+- [x] `npm run typecheck` passe.
+- [x] `npm run build` passe.
+- [x] Suite Vitest complète : 258 tests réussis lors de la validation globale.
+- [x] Suite unitaire relancée après les dernières évolutions UI : 171 tests réussis.
+- [x] Suite d’intégration Supabase : 87 tests réussis.
+- [x] `npm audit --omit=dev --audit-level=high` : aucune vulnérabilité de production.
+- [x] Refonte UI locale compilée : shell, dashboard, états financiers, rapports, écritures, factures et rapprochement.
+- [x] Tables métier améliorées : pagination, états vides, skeletons et responsive mobile.
+- [ ] Playwright local : environnement bloqué par l’absence de `libnspr4.so`.
+
 ## P0 - Bloquants de mise en production
 
 ### Secrets et configuration
@@ -32,6 +45,7 @@ Cette checklist couvre les éléments restant à traiter avant de déclarer Sade
 - [ ] Installer `libnspr4` localement pour exécuter Playwright.
 - [ ] Exécuter `npm run test:e2e` localement.
 - [ ] Vérifier le job E2E sur GitHub Actions (scénarios ajoutés, dernier workflow en échec ; logs détaillés à consulter dans GitHub).
+- [ ] Vérifier visuellement les parcours principaux sur desktop et mobile avec Playwright.
 
 ## P1 - Fonctionnalités métier indispensables
 
@@ -122,7 +136,8 @@ Cette checklist couvre les éléments restant à traiter avant de déclarer Sade
 
 ### Sécurité npm
 
-- [ ] Remplacer ou isoler `xlsx` dans un environnement d’exécution séparé.
+- [x] Maintenir `xlsx` uniquement dans `devDependencies`, hors du bundle de production.
+- [ ] Remplacer `xlsx` ou isoler son exécution si des fichiers Excel entrent dans un futur flux utilisateur.
 - [ ] Maintenir `npm audit --omit=dev` à zéro vulnérabilité.
 - [ ] Surveiller l’existence d’un correctif maintenu pour `xlsx`.
 - [ ] Revoir les dépendances majeures à chaque release.

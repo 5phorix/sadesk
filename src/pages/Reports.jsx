@@ -1,19 +1,18 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { generateText } from '@/api/aiClient';
 import { toastSupabaseError } from '@/lib/supabase-errors';
 import { useUser } from '@/components/hooks/useUser';
+import { buildFinancialStatements } from '@/lib/accounting';
 import PageHeader from '@/components/common/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { 
-  TrendingUp, 
   Download, 
   Sparkles,
-  BarChart3,
   DollarSign,
   BookOpen,
   Scale,
@@ -28,11 +27,25 @@ export default function Reports() {
   const [selectedPeriod, setSelectedPeriod] = useState('current_year');
   const [aiAnalysisLoading, setAiAnalysisLoading] = useState(false);
   const [aiInsight, setAiInsight] = useState(null);
-  const [activeReport, setActiveReport] = useState('balance');
+  const [activeReport, setActiveReport] = useState('ledger');
 
   const { data: entries = [] } = useQuery({
     queryKey: ['entries', user?.active_company_id],
     queryFn: async () => { const { data, error } = await supabase.from('accounting_entries').select('*').eq('company_id', user.active_company_id).eq('is_validated', true); if (error) throw error; return data; },
+    enabled: !!user?.active_company_id
+  });
+
+  const { data: company } = useQuery({
+    queryKey: ['company_reports', user?.active_company_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('accounting_plan')
+        .eq('id', user.active_company_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
     enabled: !!user?.active_company_id
   });
 
@@ -65,81 +78,46 @@ export default function Reports() {
     });
   };
 
-  // Calcul Balance Générale (6 colonnes réglementaires)
-  const calculateBalance = () => {
-    const filtered = filterEntriesByPeriod();
-    const accounts = {};
+  const periodEntries = useMemo(() => filterEntriesByPeriod(), [entries, selectedPeriod]);
+  const periodEnd = useMemo(() => getPeriodDates().end, [selectedPeriod]);
+  const entriesThroughPeriodEnd = useMemo(() => entries.filter((entry) => {
+    const date = new Date(entry.date);
+    return !Number.isNaN(date.getTime()) && date <= periodEnd;
+  }), [entries, periodEnd]);
 
-    filtered.forEach(entry => {
-      if (!accounts[entry.account_code]) {
-        accounts[entry.account_code] = {
-          code: entry.account_code,
-          label: entry.account_label || `Compte ${entry.account_code}`,
-          debit: 0,
-          credit: 0
-        };
-      }
-      accounts[entry.account_code].debit += parseFloat(entry.debit) || 0;
-      accounts[entry.account_code].credit += parseFloat(entry.credit) || 0;
-    });
+  const periodStatements = useMemo(() => buildFinancialStatements({
+    entries: periodEntries,
+    planCode: company?.accounting_plan || 'PCG'
+  }), [periodEntries, company?.accounting_plan]);
 
-    return Object.values(accounts).map(acc => {
-      const solde = acc.debit - acc.credit;
-      return {
-        ...acc,
-        balance: solde,
-        soldeDebiteur: solde > 0 ? solde : 0,
-        soldeCrediteur: solde < 0 ? Math.abs(solde) : 0
-      };
-    }).sort((a, b) => a.code.localeCompare(b.code));
-  };
+  const balanceStatements = useMemo(() => buildFinancialStatements({
+    entries: entriesThroughPeriodEnd,
+    planCode: company?.accounting_plan || 'PCG'
+  }), [entriesThroughPeriodEnd, company?.accounting_plan]);
 
-  // Calcul Compte de Résultat
-  const calculateProfitLoss = () => {
-    const filtered = filterEntriesByPeriod();
-    const charges = filtered.filter(e => e.account_code?.startsWith('6'))
-      .reduce((sum, e) => sum + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0);
-    
-    const produits = filtered.filter(e => e.account_code?.startsWith('7'))
-      .reduce((sum, e) => sum + (parseFloat(e.credit) || 0) - (parseFloat(e.debit) || 0), 0);
+  // Les soldes de gestion sont périodiques ; le bilan est cumulé jusqu'à la clôture.
+  const calculateBalance = () => balanceStatements.balances;
 
-    return {
-      charges: Math.abs(charges),
-      produits,
-      resultat: produits - Math.abs(charges)
-    };
-  };
+  const calculateProfitLoss = () => ({
+    charges: periodStatements.compteResultat.totalCharges,
+    produits: periodStatements.compteResultat.totalProduits,
+    resultat: periodStatements.compteResultat.resultatNet
+  });
 
-  // Calcul Bilan
   const calculateBalanceSheet = () => {
-    const filtered = filterEntriesByPeriod();
-    
-    const actif = {
-      immobilisations: filtered.filter(e => e.account_code?.startsWith('2'))
-        .reduce((sum, e) => sum + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0),
-      stocks: filtered.filter(e => e.account_code?.startsWith('3'))
-        .reduce((sum, e) => sum + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0),
-      creances: filtered.filter(e => e.account_code?.startsWith('4') && parseFloat(e.account_code) < 45)
-        .reduce((sum, e) => sum + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0),
-      tresorerie: filtered.filter(e => e.account_code?.startsWith('5'))
-        .reduce((sum, e) => sum + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0)
-    };
-
-    const passif = {
-      capitaux: filtered.filter(e => e.account_code?.startsWith('1'))
-        .reduce((sum, e) => sum + (parseFloat(e.credit) || 0) - (parseFloat(e.debit) || 0), 0),
-      dettes: filtered.filter(e => e.account_code?.startsWith('4') && parseFloat(e.account_code) >= 45)
-        .reduce((sum, e) => sum + (parseFloat(e.credit) || 0) - (parseFloat(e.debit) || 0), 0)
-    };
-
+    const { actif, passif } = balanceStatements.bilan;
     return {
       actif: {
-        ...actif,
-        total: Object.values(actif).reduce((sum, v) => sum + v, 0)
+        immobilisations: actif.actifImmobilise.totalNet,
+        stocks: actif.actifCirculant.stocks.totalNet,
+        creances: actif.actifCirculant.creancesClients.totalNet + actif.actifCirculant.autresCreances.amount,
+        tresorerie: actif.actifCirculant.tresorerieActive.amount,
+        total: actif.totalNet
       },
       passif: {
-        ...passif,
-        total: Object.values(passif).reduce((sum, v) => sum + v, 0)
+        capitaux: passif.capitauxPropres.total,
+        dettes: passif.dettes.total,
+        total: passif.total
       }
     };
   };
@@ -275,12 +253,19 @@ Format: Markdown avec structure claire.`;
   };
 
   const balance = calculateBalance();
-  const profitLoss = calculateProfitLoss();
-  const balanceSheet = calculateBalanceSheet();
   const cashFlow = calculateCashFlow();
   const ledger = generateLedger();
 
   const reports = [
+    {
+      id: 'ledger',
+      name: 'Grand Livre',
+      icon: BookOpen,
+      color: 'from-amber-600 to-orange-700',
+      activeBorder: 'border-amber-500 bg-amber-50/40',
+      iconBg: 'bg-amber-100 text-amber-700',
+      description: 'Détail chronologique et solde progressif par compte'
+    },
     {
       id: 'balance',
       name: 'Balance Générale',
@@ -291,24 +276,6 @@ Format: Markdown avec structure claire.`;
       description: 'Vue d’ensemble des soldes Débiteur/Créditeur de tous les comptes'
     },
     {
-      id: 'profit_loss',
-      name: 'Compte de Résultat',
-      icon: TrendingUp,
-      color: 'from-teal-600 to-emerald-700',
-      activeBorder: 'border-teal-500 bg-teal-50/40',
-      iconBg: 'bg-teal-100 text-teal-700',
-      description: 'Produits et charges de la période avec résultat net'
-    },
-    {
-      id: 'balance_sheet',
-      name: 'Bilan Synthétique',
-      icon: BarChart3,
-      color: 'from-purple-600 to-pink-700',
-      activeBorder: 'border-purple-500 bg-purple-50/40',
-      iconBg: 'bg-purple-100 text-purple-700',
-      description: 'Actif et passif à la date de clôture de l’exercice'
-    },
-    {
       id: 'cash_flow',
       name: 'Flux de Trésorerie',
       icon: DollarSign,
@@ -316,15 +283,6 @@ Format: Markdown avec structure claire.`;
       activeBorder: 'border-emerald-500 bg-emerald-50/40',
       iconBg: 'bg-emerald-100 text-emerald-700',
       description: 'Mouvements de trésorerie par catégorie d’activité'
-    },
-    {
-      id: 'ledger',
-      name: 'Grand Livre',
-      icon: BookOpen,
-      color: 'from-amber-600 to-orange-700',
-      activeBorder: 'border-amber-500 bg-amber-50/40',
-      iconBg: 'bg-amber-100 text-amber-700',
-      description: 'Détail chronologique et solde progressif par compte'
     }
   ];
 
@@ -337,7 +295,7 @@ Format: Markdown avec structure claire.`;
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger className="w-44 bg-white border-slate-200 rounded-xl text-xs h-10 font-medium">
+              <SelectTrigger className="w-44 bg-white/80 border-[#e2e8f0] rounded-lg text-xs h-10 font-medium">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -349,7 +307,7 @@ Format: Markdown avec structure claire.`;
             <Button
               onClick={handleAIAnalysis}
               disabled={aiAnalysisLoading}
-              className="gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm hover:from-purple-700 hover:to-indigo-700 rounded-xl text-xs h-10 font-semibold"
+              className="gap-2 bg-[#142638] text-white shadow-md hover:bg-[#24445a] rounded-lg text-xs h-10 font-semibold"
             >
               <Sparkles className="h-4 w-4" />
               {aiAnalysisLoading ? 'Analyse en cours...' : 'Analyse IA Expert'}
@@ -387,25 +345,25 @@ Format: Markdown avec structure claire.`;
               key={report.id}
               onClick={() => setActiveReport(report.id)}
               className={cn(
-                "cursor-pointer rounded-2xl border p-4 transition-all duration-200 flex flex-col justify-between shadow-2xs hover:-translate-y-0.5",
+                "cursor-pointer rounded-xl border p-4 transition-all duration-200 flex flex-col justify-between shadow-sm hover:-translate-y-0.5",
                 isSelected
-                  ? cn("border-2 shadow-sm", report.activeBorder)
-                  : "bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/50"
+                  ? "border-2 border-[#f5871f] bg-[#142638] text-white shadow-lg shadow-slate-900/10"
+                  : "bg-white/70 border-[#e2e8f0] hover:border-[#f5871f] hover:bg-white"
               )}
             >
               <div className="flex items-center justify-between mb-3">
-                <div className={cn("p-2.5 rounded-xl flex items-center justify-center transition-colors", isSelected ? cn("bg-gradient-to-br text-white shadow-sm", report.color) : report.iconBg)}>
+                <div className={cn("p-2.5 rounded-lg flex items-center justify-center transition-colors", isSelected ? "bg-[#f5871f] text-[#142638]" : "bg-[#f1f5f9] text-[#475569]")}>
                   <Icon className="h-4 w-4" />
                 </div>
                 {isSelected && (
-                  <Badge variant="outline" className="text-[10px] font-bold px-1.5 py-0 bg-white border-slate-300">
+                    <Badge variant="outline" className="text-[10px] font-bold px-1.5 py-0 bg-white/10 border-white/20 text-white">
                     Actif
                   </Badge>
                 )}
               </div>
               <div>
-                <p className="font-bold text-slate-900 text-xs sm:text-sm">{report.name}</p>
-                <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 leading-tight">{report.description}</p>
+                <p className={cn("font-bold text-xs sm:text-sm", isSelected ? "text-white" : "text-slate-900")}>{report.name}</p>
+                <p className={cn("text-[11px] mt-0.5 line-clamp-2 leading-tight", isSelected ? "text-slate-300" : "text-slate-500")}>{report.description}</p>
               </div>
             </div>
           );
@@ -414,8 +372,8 @@ Format: Markdown avec structure claire.`;
 
       {/* Contenu des rapports */}
       {activeReport === 'balance' && (
-        <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
-          <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
+        <Card className="rounded-xl border-[#e2e8f0] bg-white/70 shadow-sm overflow-hidden">
+          <CardHeader className="bg-[#f1f5f9]/60 border-b border-[#e2e8f0] p-5">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <CardTitle className="text-lg font-bold text-slate-900">Balance Générale des Comptes</CardTitle>
@@ -429,9 +387,9 @@ Format: Markdown avec structure claire.`;
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full min-w-[780px] text-left text-xs">
                 <thead>
-                  <tr className="bg-slate-100/90 text-slate-700 font-bold uppercase border-b border-slate-200">
+                  <tr className="bg-[#f1f5f9]/70 text-[#475569] font-bold uppercase border-b border-[#e2e8f0]">
                     <th className="py-3 px-4 w-28">N° Compte</th>
                     <th className="py-3 px-4">Intitulé du compte</th>
                     <th className="py-3 px-4 text-right w-36 bg-blue-50/40 text-blue-900">Total Débit</th>
@@ -482,136 +440,6 @@ Format: Markdown avec structure claire.`;
                   </tr>
                 </tfoot>
               </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeReport === 'profit_loss' && (
-        <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
-          <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-lg font-bold text-slate-900">Compte de Résultat Synthétique</CardTitle>
-                <p className="text-xs text-slate-500 mt-0.5">Synthèse des charges et produits de la période sélectionnée</p>
-              </div>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Download className="h-4 w-4" />
-                Exporter CSV
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-5 sm:p-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
-                <h3 className="font-bold text-rose-700 text-sm mb-3 flex items-center gap-2">
-                  <div className="h-2.5 w-2.5 rounded-full bg-rose-600" />
-                  Charges d'Exploitation & Générales (Cl. 6)
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-600">Total des charges décaissées</span>
-                    <AmountDisplay amount={profitLoss.charges} size="sm" className="font-bold font-mono text-rose-700" />
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
-                <h3 className="font-bold text-emerald-700 text-sm mb-3 flex items-center gap-2">
-                  <div className="h-2.5 w-2.5 rounded-full bg-emerald-600" />
-                  Produits d'Exploitation & Ventes (Cl. 7)
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-600">Total des produits et ventes</span>
-                    <AmountDisplay amount={profitLoss.produits} size="sm" className="font-bold font-mono text-emerald-700" />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className={cn(
-              "mt-6 rounded-2xl p-5 border flex items-center justify-between shadow-2xs",
-              profitLoss.resultat >= 0 ? "bg-emerald-50/70 border-emerald-200" : "bg-rose-50/70 border-rose-200"
-            )}>
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Solde Net</span>
-                <p className="text-lg font-bold text-slate-900">RÉSULTAT NET COMPTABLE</p>
-              </div>
-              <AmountDisplay 
-                amount={profitLoss.resultat} 
-                size="xl" 
-                showSign 
-                className={cn("font-bold font-mono", profitLoss.resultat >= 0 ? "text-emerald-700" : "text-rose-700")}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeReport === 'balance_sheet' && (
-        <Card className="rounded-3xl border-slate-200/90 shadow-xs overflow-hidden">
-          <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 p-5">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-lg font-bold text-slate-900">Bilan Comptable Simplifié</CardTitle>
-                <p className="text-xs text-slate-500 mt-0.5">Photo patrimoniale de la société à la date de situation</p>
-              </div>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Download className="h-4 w-4" />
-                Exporter CSV
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-5 sm:p-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
-                <h3 className="font-bold text-blue-700 text-sm mb-3 flex items-center gap-2">
-                  <div className="h-2.5 w-2.5 rounded-full bg-blue-600" />
-                  ACTIF (Emplois)
-                </h3>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-600">Immobilisations (Cl. 2)</span>
-                    <AmountDisplay amount={balanceSheet.actif.immobilisations} size="sm" className="font-mono font-medium" />
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-600">Stocks (Cl. 3)</span>
-                    <AmountDisplay amount={balanceSheet.actif.stocks} size="sm" className="font-mono font-medium" />
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-600">Créances clients (Cl. 4)</span>
-                    <AmountDisplay amount={balanceSheet.actif.creances} size="sm" className="font-mono font-medium" />
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-600">Disponibilités & Trésorerie (Cl. 5)</span>
-                    <AmountDisplay amount={balanceSheet.actif.tresorerie} size="sm" className="font-mono font-medium" />
-                  </div>
-                  <div className="flex justify-between py-3 bg-blue-50/70 border border-blue-200 rounded-xl px-3 mt-4 text-blue-950 font-bold">
-                    <span>TOTAL ACTIF</span>
-                    <AmountDisplay amount={balanceSheet.actif.total} size="md" className="font-mono font-bold text-blue-900" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
-                <h3 className="font-bold text-purple-700 text-sm mb-3 flex items-center gap-2">
-                  <div className="h-2.5 w-2.5 rounded-full bg-purple-600" />
-                  PASSIF (Ressources)
-                </h3>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-600">Capitaux propres & Réserves (Cl. 1)</span>
-                    <AmountDisplay amount={balanceSheet.passif.capitaux} size="sm" className="font-mono font-medium" />
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-600">Dettes fournisseurs & fiscales (Cl. 4/5)</span>
-                    <AmountDisplay amount={balanceSheet.passif.dettes} size="sm" className="font-mono font-medium" />
-                  </div>
-                  <div className="flex justify-between py-3 bg-purple-50/70 border border-purple-200 rounded-xl px-3 mt-4 text-purple-950 font-bold">
-                    <span>TOTAL PASSIF</span>
-                    <AmountDisplay amount={balanceSheet.passif.total} size="md" className="font-mono font-bold text-purple-900" />
-                  </div>
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>

@@ -17,6 +17,8 @@ import { format, parseISO } from 'date-fns';
 import { AlertTriangle, BookOpen, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { usePagination } from '@/components/common/usePagination';
+import PaginationBar from '@/components/common/PaginationBar';
 
 const MONTHS = [
   { value: 'all', label: 'Tout l’exercice' },
@@ -217,102 +219,110 @@ export default function Journals() {
             </Card>
           )}
 
-          {journals.map((journal) => {
-            const pal = JOURNAL_PALETTE[journal.code] || { badge: 'bg-slate-100 text-slate-900', dot: 'bg-slate-500', bar: 'border-l-slate-400' };
-            return (
-              <Card key={journal.code} className={cn("rounded-2xl border-slate-200/90 shadow-xs overflow-hidden border-l-4", pal.bar)}>
-                <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 py-3.5 px-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <Badge variant="outline" className={cn("text-xs font-mono font-bold px-2.5 py-0.5", pal.badge)}>
-                        <span className={cn("w-1.5 h-1.5 rounded-full mr-1.5", pal.dot)} />
-                        Journal {journal.code}
-                      </Badge>
-                      <h3 className="font-bold text-slate-900 text-base">{journalLabel(journal.code)}</h3>
-                    </div>
-                    <div className="flex items-center gap-2.5 text-xs font-mono">
-                      <span className="text-slate-500">{journal.count} ligne(s)</span>
-                      <span className="text-slate-700 font-semibold">• D: {euro(journal.debit)}</span>
-                      <span className="text-slate-700 font-semibold">• C: {euro(journal.credit)}</span>
-                      {journal.isBalanced ? (
-                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">
-                          Équilibré ✓
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-rose-100 text-rose-800 text-[10px]">
-                          Déséquilibre {euro(journal.balance)}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 space-y-4">
-                  {groupByVoucher(journal.entries).map((voucher) => (
-                    <div key={voucher.entryNumber || voucher.lines[0].id} className="rounded-xl border border-slate-200/70 bg-white overflow-hidden shadow-2xs">
-                      <div className="px-3.5 py-2 bg-slate-50/70 border-b border-slate-200/60 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-slate-800">
-                            Pièce : {voucher.entryNumber || 'Sans N°'}
-                          </span>
-                          <span className="text-slate-400">•</span>
-                          <span className="text-slate-600 font-mono">
-                            {format(parseISO(voucher.date), 'dd/MM/yyyy')}
-                          </span>
-                        </div>
-                        <div>
-                          {!voucher.isBalanced && (
-                            <Badge className="bg-rose-100 text-rose-800 text-[10px]">Déséquilibrée</Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs text-left">
-                          <thead>
-                            <tr className="bg-slate-100/40 text-slate-500 border-b border-slate-100 text-[11px]">
-                              <th className="py-2 px-3 w-28">N° Compte</th>
-                              <th className="py-2 px-3">Intitulé</th>
-                              <th className="py-2 px-3">Libellé</th>
-                              <th className="py-2 px-2 text-center w-20">Lettrage</th>
-                              <th className="py-2 px-3 text-right w-28">Débit</th>
-                              <th className="py-2 px-3 text-right w-28">Crédit</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {voucher.lines.map((line) => (
-                              <tr key={line.id} className="hover:bg-slate-50/70 transition-colors">
-                                <td className="py-2 px-3 font-mono font-bold text-slate-800">
-                                  {line.account_code}
-                                </td>
-                                <td className="py-2 px-3 font-medium text-slate-700">{line.account_label}</td>
-                                <td className="py-2 px-3 text-slate-600">{line.label}</td>
-                                <td className="py-2 px-2 text-center font-mono">
-                                  {line.lettering ? (
-                                    <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-700 border-indigo-200">
-                                      {line.lettering}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-slate-300">-</span>
-                                  )}
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900">
-                                  {Number(line.debit) > 0 ? `${Number(line.debit).toFixed(2)} €` : '-'}
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900">
-                                  {Number(line.credit) > 0 ? `${Number(line.credit).toFixed(2)} €` : '-'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            );
-          })}
+          {journals.map((journal) => (
+            <JournalCard key={journal.code} journal={journal} />
+          ))}
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+function JournalCard({ journal }) {
+  const pal = JOURNAL_PALETTE[journal.code] || { badge: 'bg-slate-100 text-slate-900', dot: 'bg-slate-500', bar: 'border-l-slate-400' };
+  const vouchers = useMemo(() => groupByVoucher(journal.entries), [journal.entries]);
+  const { paginatedItems: pagedVouchers, currentPage, totalPages, totalItems, goToPrevious, goToNext } = usePagination(vouchers, 10);
+
+  return (
+    <Card className={cn("rounded-2xl border-slate-200/90 shadow-xs overflow-hidden border-l-4", pal.bar)}>
+      <CardHeader className="bg-slate-50/80 border-b border-slate-200/80 py-3.5 px-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className={cn("text-xs font-mono font-bold px-2.5 py-0.5", pal.badge)}>
+              <span className={cn("w-1.5 h-1.5 rounded-full mr-1.5", pal.dot)} />
+              Journal {journal.code}
+            </Badge>
+            <h3 className="font-bold text-slate-900 text-base">{journalLabel(journal.code)}</h3>
+          </div>
+          <div className="flex items-center gap-2.5 text-xs font-mono">
+            <span className="text-slate-500">{journal.count} ligne(s)</span>
+            <span className="text-slate-700 font-semibold">• D: {euro(journal.debit)}</span>
+            <span className="text-slate-700 font-semibold">• C: {euro(journal.credit)}</span>
+            {journal.isBalanced ? (
+              <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">
+                Équilibré ✓
+              </Badge>
+            ) : (
+              <Badge className="bg-rose-100 text-rose-800 text-[10px]">
+                Déséquilibre {euro(journal.balance)}
+              </Badge>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-4 space-y-4">
+        {pagedVouchers.map((voucher) => (
+          <div key={voucher.entryNumber || voucher.lines[0].id} className="rounded-xl border border-slate-200/70 bg-white overflow-hidden shadow-2xs">
+            <div className="px-3.5 py-2 bg-slate-50/70 border-b border-slate-200/60 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-bold text-slate-800">
+                  Pièce : {voucher.entryNumber || 'Sans N°'}
+                </span>
+                <span className="text-slate-400">•</span>
+                <span className="text-slate-600 font-mono">
+                  {format(parseISO(voucher.date), 'dd/MM/yyyy')}
+                </span>
+              </div>
+              <div>
+                {!voucher.isBalanced && (
+                  <Badge className="bg-rose-100 text-rose-800 text-[10px]">Déséquilibrée</Badge>
+                )}
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="bg-slate-100/40 text-slate-500 border-b border-slate-100 text-[11px]">
+                    <th className="py-2 px-3 w-28">N° Compte</th>
+                    <th className="py-2 px-3">Intitulé</th>
+                    <th className="py-2 px-3">Libellé</th>
+                    <th className="py-2 px-2 text-center w-20">Lettrage</th>
+                    <th className="py-2 px-3 text-right w-28">Débit</th>
+                    <th className="py-2 px-3 text-right w-28">Crédit</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {voucher.lines.map((line) => (
+                    <tr key={line.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-2 px-3 font-mono font-bold text-slate-800">
+                        {line.account_code}
+                      </td>
+                      <td className="py-2 px-3 font-medium text-slate-700">{line.account_label}</td>
+                      <td className="py-2 px-3 text-slate-600">{line.label}</td>
+                      <td className="py-2 px-2 text-center font-mono">
+                        {line.lettering ? (
+                          <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-700 border-indigo-200">
+                            {line.lettering}
+                          </Badge>
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900">
+                        {Number(line.debit) > 0 ? `${Number(line.debit).toFixed(2)} €` : '-'}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900">
+                        {Number(line.credit) > 0 ? `${Number(line.credit).toFixed(2)} €` : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+      <PaginationBar currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} pageSize={10} onPrevious={goToPrevious} onNext={goToNext} />
+    </Card>
   );
 }

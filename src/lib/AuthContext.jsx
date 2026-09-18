@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { isSupabaseConfigured, supabase } from '@/api/supabaseClient';
 
 const AuthContext = createContext();
@@ -10,6 +10,8 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [appPublicSettings] = useState(null);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const isPasswordRecoveryRef = useRef(false);
 
   useEffect(() => {
     checkAppState();
@@ -101,11 +103,25 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        isPasswordRecoveryRef.current = true;
+        setIsPasswordRecovery(true);
+        setIsLoadingAuth(false);
+        return;
+      }
+      // Ignore auth churn (ex: USER_UPDATED) while the reset-password screen owns the flow
+      if (isPasswordRecoveryRef.current) return;
       checkUserAuth();
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  const clearPasswordRecovery = () => {
+    isPasswordRecoveryRef.current = false;
+    setIsPasswordRecovery(false);
+    checkUserAuth();
+  };
 
   return (
     <AuthContext.Provider value={{ 
@@ -115,6 +131,8 @@ export const AuthProvider = ({ children }) => {
       isLoadingPublicSettings,
       authError,
       appPublicSettings,
+      isPasswordRecovery,
+      clearPasswordRecovery,
       logout,
       navigateToLogin,
       checkAppState
