@@ -78,7 +78,7 @@ export default function CashForecast() {
   return (
     <ProtectedRoute>
       <div className="space-y-6">
-        <PageHeader title="Prévision de trésorerie" subtitle="Anticipez vos encaissements, décaissements et besoins de financement" actions={<Select value={scenario} onValueChange={setScenario}><SelectTrigger className="w-[150px] bg-white"><SelectValue /></SelectTrigger><SelectContent>{SCENARIOS.map((item) => <SelectItem key={item.key} value={item.key}>{item.label}</SelectItem>)}</SelectContent></Select>} />
+        <PageHeader title="Prévision de trésorerie" subtitle="Anticipez vos encaissements, décaissements et besoins de financement" actions={<Select value={scenario} onValueChange={setScenario}><SelectTrigger className="w-full sm:w-[150px] bg-white"><SelectValue /></SelectTrigger><SelectContent>{SCENARIOS.map((item) => <SelectItem key={item.key} value={item.key}>{item.label}</SelectItem>)}</SelectContent></Select>} />
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Card><CardContent className="p-5"><div className="flex items-center gap-3"><div className="rounded-xl bg-blue-50 p-2.5 text-blue-600"><Landmark className="h-5 w-5" /></div><div><p className="text-sm text-slate-500">Solde actuel</p><AmountDisplay amount={forecast.currentBalance} size="lg" className="font-bold" /></div></div></CardContent></Card>

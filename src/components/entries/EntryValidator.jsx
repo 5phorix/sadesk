@@ -19,7 +19,7 @@ export default function EntryValidator({ entries }) {
           )}
           <div className="flex-1">
             <h3 className={`font-semibold ${isBalanced ? 'text-emerald-900' : 'text-red-900'}`}>
-              {isBalanced ? 'Partie double respectée ✓' : 'Déséquilibre détecté'}
+              {isBalanced ? 'Écriture équilibrée ✓' : 'Déséquilibre détecté'}
             </h3>
             <div className="flex items-center gap-4 mt-2 text-sm">
               <div>

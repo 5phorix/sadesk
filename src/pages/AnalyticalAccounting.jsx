@@ -256,7 +256,7 @@ export default function AnalyticalAccounting() {
                   <CardDescription>Charges, produits et résultat</CardDescription>
                 </div>
                 <Select value={selectedCenter} onValueChange={setSelectedCenter}>
-                  <SelectTrigger className="w-64">
+                  <SelectTrigger className="w-full sm:w-64">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

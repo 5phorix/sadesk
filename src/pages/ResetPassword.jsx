@@ -46,7 +46,7 @@ export default function ResetPassword() {
     <main className="min-h-screen flex items-center justify-center bg-white px-6">
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center gap-3">
-          <img src="/logo%20sadesk.png" alt="Sadesk Logo" className="h-16 w-16 object-contain" />
+          <img src="/logo_sadesk.png" alt="Sadesk Logo" className="h-16 w-16 object-contain" />
           <span className="text-3xl font-bold tracking-tight">
             <span className="text-[#142638]">SADESK</span><br /><span className="text-blue-600">Compta</span>
           </span>

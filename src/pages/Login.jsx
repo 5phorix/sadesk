@@ -40,12 +40,12 @@ export default function Login() {
   };
 
   return (
-    <main className="min-h-screen flex bg-white">
+    <main className="flex min-h-screen flex-col bg-white lg:flex-row">
       {/* Formulaire */}
       <section className="flex-1 flex items-center justify-center px-6 sm:px-12 lg:px-20 py-12">
         <div className="mx-auto w-full max-w-md">
           <div className="mb-8 flex items-center gap-3">
-            <img src="/logo%20sadesk.png" alt="Sadesk Logo" className="h-16 w-16 object-contain" />
+            <img src="/logo_sadesk.png" alt="Sadesk Logo" className="h-16 w-16 object-contain" />
             <span className="text-3xl font-bold tracking-tight">
               <span className="text-[#142638]">SADESK</span><br /><span className="text-blue-600">Compta</span>
             </span>
@@ -148,16 +148,16 @@ export default function Login() {
         </div>
       </section>
 
-      {/* Panneau illustratif (masqué sur mobile) */}
-      <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
+      {/* Panneau illustratif */}
+      <div className="relative block h-[220px] w-full overflow-hidden sm:h-[300px] lg:h-auto lg:w-1/2">
         <img
           src="/sadesk-connexion-building.png"
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
         />
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-white/90 via-white/40 to-transparent p-10 pt-24">
-          <p className="text-3xl font-bold text-[#142638]">Multi-sociétés</p>
-          <ul className="mt-2 space-y-1 text-xl font-bold text-[#142638]">
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#062c32]/95 via-[#062c32]/70 to-transparent p-10 pt-24">
+          <p className="text-3xl font-bold text-white">Multi-sociétés</p>
+          <ul className="mt-2 space-y-1 text-xl font-bold text-white">
             <li>• Sécurisé</li>
             <li className="relative inline-block">
               Performant

@@ -574,7 +574,7 @@ export default function Entries() {
           />
           <p className="text-xs text-slate-500 mt-1">
             {Math.abs(totals.debit - totals.credit) < 0.01 
-              ? 'Principe de la partie double respecté' 
+              ? 'Débit et crédit sont équilibrés'
               : 'Écart Débit / Crédit à régulariser'}
           </p>
         </div>

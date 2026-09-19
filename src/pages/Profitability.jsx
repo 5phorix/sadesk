@@ -236,7 +236,7 @@ export default function Profitability() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
-                className="w-64 pl-9"
+                className="w-full sm:w-64 pl-9"
                 placeholder="Rechercher…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}

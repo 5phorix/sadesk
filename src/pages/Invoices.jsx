@@ -388,7 +388,7 @@ export default function Invoices() {
           </Tabs>
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Statut" />
             </SelectTrigger>
             <SelectContent>

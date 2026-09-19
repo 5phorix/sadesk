@@ -157,7 +157,7 @@ export default function Lettering() {
           subtitle="Rapprochez factures et règlements sur les comptes de tiers"
           actions={
             <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-              <SelectTrigger className="w-64">
+              <SelectTrigger className="w-full sm:w-64">
                 <SelectValue placeholder="Tous les comptes" />
               </SelectTrigger>
               <SelectContent>

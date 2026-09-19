@@ -184,7 +184,7 @@ export default function CompanySelector() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <img 
-              src="/logo%20sadesk.png" 
+              src="/logo_sadesk.png"
               alt="Sadesk" 
               className="h-12 w-12"
             />

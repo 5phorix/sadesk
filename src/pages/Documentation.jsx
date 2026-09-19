@@ -275,7 +275,7 @@ Cœur du système comptable : toutes les écritures respectant la partie double.
 
 ### Validation partie double
 Le système affiche en temps réel :
-- ✓ Total Débit = Total Crédit : Partie double respectée
+- ✓ Total Débit = Total Crédit : Écriture équilibrée
 - ✗ Déséquilibre : Écart détecté avec montant
 
 ### Génération depuis factures

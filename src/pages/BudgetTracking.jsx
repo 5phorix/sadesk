@@ -471,7 +471,7 @@ export default function BudgetTracking() {
                       value={detail.budget.id}
                       onValueChange={(value) => setDetailBudgetId(value)}
                     >
-                      <SelectTrigger className="w-64">
+                      <SelectTrigger className="w-full sm:w-64">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

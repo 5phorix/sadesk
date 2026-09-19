@@ -219,7 +219,7 @@ export default function Layout({ children, currentPageName }) {
             </button>
             <div className="flex items-center gap-2">
               <img 
-                src="/logo%20sadesk.png" 
+                src="/logo_sadesk.png"
                 alt="Sadesk Logo" 
                 className="h-8 w-8 object-contain"
               />
@@ -263,7 +263,7 @@ export default function Layout({ children, currentPageName }) {
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <Link to={createPageUrl('Dashboard')} className="flex items-center gap-3">
               <img 
-                src="/logo%20sadesk.png" 
+                src="/logo_sadesk.png"
                 alt="Sadesk Logo" 
                 className="h-10 w-10 object-contain flex-shrink-0"
               />
