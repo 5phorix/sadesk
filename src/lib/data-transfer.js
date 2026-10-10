@@ -44,15 +44,16 @@ export function parseCsv(text, separator = ';') {
   ));
 }
 
-export function parseStructuredData(text, importType, format) {
+export function parseStructuredData(text, importType, format, separator = ';') {
   if (format === 'json') {
     const parsed = JSON.parse(text);
-    const data = Array.isArray(parsed) ? parsed : parsed?.[DATA_KEYS[importType]];
+    const data = Array.isArray(parsed) ? parsed : parsed?.[DATA_KEYS[importType]] ?? parsed?.[importType];
     if (!Array.isArray(data)) throw new Error('Le JSON doit contenir un tableau de données.');
     return data;
   }
 
-  return parseCsv(text).map((row) => normalizeCsvRow(row, importType));
+  const normalizedImportType = importType === 'third_parties' ? 'thirdparties' : importType;
+  return parseCsv(text, separator).map((row) => normalizeCsvRow(row, normalizedImportType));
 }
 
 export function normalizeCsvRow(row, importType) {
@@ -60,7 +61,7 @@ export function normalizeCsvRow(row, importType) {
     invoices: {
       'Numéro': 'invoice_number', Type: 'type', Date: 'date', 'Échéance': 'due_date',
       Tiers: 'third_party_name', Description: 'description', 'Montant HT': 'amount_ht',
-      'TVA %': 'tva_rate', 'Montant TVA': 'amount_tva', 'Montant TTC': 'amount_ttc', Statut: 'status'
+      'TVA %': 'tva_rate', 'Montant TVA': 'amount_tva', 'Montant TTC': 'amount_ttc', Devise: 'currency', Statut: 'status'
     },
     thirdparties: {
       Code: 'code', Type: 'type', Nom: 'name', Contact: 'contact_name', Email: 'email',

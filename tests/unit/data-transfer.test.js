@@ -29,6 +29,12 @@ describe('transfert de donnees', () => {
     ]);
   });
 
+  it('parse un CSV avec un separateur explicite', () => {
+    expect(parseStructuredData('Nom,Code\nClient A,CLI-1', 'thirdparties', 'csv', ',')).toEqual([
+      { name: 'Client A', code: 'CLI-1' },
+    ]);
+  });
+
   it('serialize un CSV et un JSON telechargeables', () => {
     const rows = [{ Code: '401000', Libelle: 'Fournisseur "A"' }];
 
