@@ -2,18 +2,17 @@
 
 Cette checklist couvre les éléments restant à traiter avant de déclarer Sadesk Compta opérationnel en production.
 
-## Validation locale au 15 septembre 2026
+## Validation locale au 17 octobre 2026
 
 - [x] `npm run lint` passe.
 - [x] `npm run typecheck` passe.
 - [x] `npm run build` passe.
-- [x] Suite Vitest complète : 258 tests réussis lors de la validation globale.
-- [x] Suite unitaire relancée après les dernières évolutions UI : 171 tests réussis.
-- [x] Suite d’intégration Supabase : 87 tests réussis.
-- [x] `npm audit --omit=dev --audit-level=high` : aucune vulnérabilité de production.
+- [x] Suite Vitest : 191 tests réussis; 87 tests d’intégration ignorés faute de cible de test Supabase autorisée.
+- [ ] Suite d’intégration Supabase à exécuter sur une cible dédiée : la configuration présente ne fournit que des identifiants Supabase généraux, désormais refusés par le garde-fou.
+- [ ] `npm audit --omit=dev --audit-level=high` échoue : 12 vulnérabilités signalées, dont 7 élevées.
 - [x] Refonte UI locale compilée : shell, dashboard, états financiers, rapports, écritures, factures et rapprochement.
 - [x] Tables métier améliorées : pagination, états vides, skeletons et responsive mobile.
-- [ ] Playwright local : environnement bloqué par l’absence de `libnspr4.so`.
+- [ ] Playwright local bloqué au lancement de Chromium par l’absence de `libnspr4.so`; les 7 scénarios n’ont pas atteint l’application.
 
 ## P0 - Bloquants de mise en production
 
@@ -161,3 +160,11 @@ La version peut être déclarée opérationnelle lorsque :
 - une sauvegarde et une restauration ont été vérifiées ;
 - aucune vulnérabilité de production élevée ou critique n’est présente ;
 - les limites connues sont documentées et acceptées.
+
+## Point d’arrêt - 17 octobre 2026
+
+- Branche de travail : `feature/api` dans le dépôt Sadesk Compta.
+- Livré aujourd’hui : console Sphorix Connect pour les imports CSV/JSON de factures et de tiers, aperçu avant écriture, traitement/reprise des lots, consultation des 100 premières erreurs et garde-fou empêchant les tests Supabase de viser une base générale.
+- Vérifications : lint, typecheck, build et 191 tests Vitest réussis; 87 tests d’intégration ignorés faute de cible de test autorisée.
+- Bloqué : Docker n’est pas démarré; Playwright ne peut pas lancer Chromium sans `libnspr4.so`; l’audit npm relève 12 vulnérabilités, dont 7 élevées.
+- Reprise : démarrer Docker et Supabase local lors de la prochaine séance, appliquer les migrations sur cette base de test, relancer l’intégration; puis traiter les vulnérabilités et poursuivre les connecteurs, le snapshot multi-entités et les parcours de production Sadesk.

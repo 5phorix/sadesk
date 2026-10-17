@@ -22,6 +22,8 @@ SUPABASE_TEST_ANON_KEY=...
 SUPABASE_TEST_SERVICE_ROLE_KEY=...
 ```
 
+Les tests refusent les variables generales `SUPABASE_URL`, `SUPABASE_ANON_KEY` et `SUPABASE_SERVICE_ROLE_KEY` comme cible. Une base distante dediee exige aussi `SUPABASE_TEST_ALLOW_REMOTE=true` et `SUPABASE_TEST_PROJECT_REF` avec le project ref correspondant exactement a l'hote `https://<project-ref>.supabase.co`. Ne configurez jamais une base de production comme cible de test.
+
 ## Exécution
 
 ```

@@ -35,6 +35,7 @@ export default async function handler(request, response) {
         .select('object_type, record_number, external_id, status, error_code, error_details, created_at')
         .eq('run_id', transfer.id)
         .eq('company_id', context.companyId)
+        .in('status', ['failed', 'unmapped'])
         .order('record_number', { ascending: true })
         .limit(100),
     ]);

@@ -240,13 +240,16 @@ Ne pas fixer le mot « majorite » a un simple nombre de noms. Suivre separement
 - [x] Previsualiser factures et tiers, valider les champs, devises, montants et doublons, puis garder un resume et les erreurs par ligne.
 - [x] Creer des executions idempotentes, suivre leur progression par entite et traiter 250 lignes maximum par appel avec lease et checkpoint.
 - [x] Relier les objets aux identifiants externes et reprendre les erreurs classees recuperables dans une execution fille.
+- [x] Corriger le traitement des reprises partielles pour calculer les lots et compteurs sur le seul sous-ensemble a rejouer.
 - [x] Garder les imports comptables en brouillon; ne jamais valider une ecriture implicitement.
 - [x] Ajouter des tests unitaires de parsing/validation et valider le flux SQL tiers -> facture dans une transaction annulee.
-- [x] Verifier lint, typecheck, build et les 183 tests unitaires.
+- [x] Verifier lint, typecheck, build et 191 tests Vitest; les tests d'integration sont ignores sans une cible de test autorisee.
 
 ### Reste a faire
 
-- [ ] Construire l'interface Sadesk pour configurer une connexion, envoyer un export, suivre l'apercu/progression et resoudre les exceptions.
+- [x] Ajouter l'interface Sadesk pour configurer une connexion fichier, deposer CSV/JSON, previsualiser, confirmer, suivre l'execution et reprendre les lots.
+- [x] Afficher les 100 premieres erreurs avec leur code et champ fautif; la route les filtre avant la limite.
+- [ ] Paginer au-dela de 100 erreurs et permettre leur resolution complete avant une reprise.
 - [ ] Definir l'authentification des clients API tiers (scopes, creation/revocation, rotation); actuellement les routes d'edition utilisent une session Sadesk.
 - [ ] Etendre la recuperation au catalogue complet des objets source et orchestrer un snapshot multi-entites avec dependances et relations.
 - [ ] Ajouter les adaptateurs editeur par editeur apres verification des API, acces partenaires, formats, quotas et environnements de test.
@@ -256,4 +259,4 @@ Ne pas fixer le mot « majorite » a un simple nombre de noms. Suivre separement
 - [ ] Definir la retention/suppression des archives brutes et du staging restant apres une execution avec exceptions.
 - [ ] Faire tourner les tests d'integration RLS/API avec un endpoint Supabase de test joignable, puis valider les routes Vercel et un fournisseur sandbox.
 
-Les migrations 0029/0030 sont presentes dans la branche et ont ete testees dans une transaction PostgreSQL annulee; elles ne sont pas appliquees a la base locale, qui etait en retard a la migration 0017. `npm test` lance les tests d'integration mais echoue sur `fetch failed` vers Supabase dans l'environnement courant; les tests unitaires passent.
+Les migrations 0029/0030 sont presentes dans la branche et doivent etre appliquees sur une base de test dediee avant validation d'integration. `npm test` passe en ignorant ces tests tant qu'une cible explicitement autorisee n'est pas configuree.

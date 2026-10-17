@@ -56,7 +56,11 @@ export default async function handler(request, response) {
     claimed = true;
 
     const nextRecordNumber = Number(claim.next_record_number);
-    const remainingCount = Math.max(0, preview.total_count - nextRecordNumber + 1);
+    const scopeTotalCount = Number(claim.total_count);
+    if (!Number.isSafeInteger(scopeTotalCount) || scopeTotalCount < 0) {
+      throw new ApiError(500, 'INVALID_SCOPE_COUNT', 'Le nombre d enregistrements du perimetre est invalide.');
+    }
+    const remainingCount = Math.max(0, scopeTotalCount - nextRecordNumber + 1);
     const expectedCount = Math.min(BATCH_SIZE, remainingCount);
     const retryRecordNumbers = Array.isArray(claim.checkpoint?.retry_record_numbers)
       ? claim.checkpoint.retry_record_numbers
@@ -101,7 +105,7 @@ export default async function handler(request, response) {
     if (applyError) throw applyError;
 
     const updatedNextRecordNumber = nextRecordNumber + batch.length;
-    const hasMore = updatedNextRecordNumber <= preview.total_count;
+    const hasMore = updatedNextRecordNumber <= scopeTotalCount;
     const { data: completion, error: completionError } = await context.adminClient.rpc('complete_integration_run_batch', {
       target_run_id: run.id,
       target_company_id: context.companyId,
@@ -116,7 +120,7 @@ export default async function handler(request, response) {
     const transfer = {
       id: run.id,
       status: completion.status,
-      total_count: preview.total_count,
+      total_count: scopeTotalCount,
       read_count: completion.read_count,
       written_count: completion.written_count,
       ignored_count: completion.ignored_count,

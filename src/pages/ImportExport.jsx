@@ -59,6 +59,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
+import SphorixConnectPanel from '@/components/integrations/SphorixConnectPanel';
 
 export default function ImportExport() {
   const { user } = useUser();
@@ -818,6 +819,10 @@ export default function ImportExport() {
             <FileCheck className="h-4 w-4" />
             FEC
           </TabsTrigger>
+          <TabsTrigger value="connect" className="gap-2">
+            <FileCheck className="h-4 w-4" />
+            Sphorix Connect
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="import" className="mt-6 space-y-6">
@@ -1224,6 +1229,10 @@ export default function ImportExport() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="connect" className="mt-6">
+          <SphorixConnectPanel />
         </TabsContent>
         </Tabs>
 
