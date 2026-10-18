@@ -14,6 +14,18 @@ Cette checklist couvre les éléments restant à traiter avant de déclarer Sade
 - [x] Tables métier améliorées : pagination, états vides, skeletons et responsive mobile.
 - [ ] Playwright local bloqué au lancement de Chromium par l’absence de `libnspr4.so`; les 7 scénarios n’ont pas atteint l’application.
 
+## Validation locale au 18 octobre 2026
+
+- [x] Démarrer la stack Supabase locale de Sadesk; les conteneurs sont sains sur les ports `54321` à `54324`.
+- [x] Réinitialiser uniquement la base locale dédiée et appliquer les migrations `0001` à `0031`, dont `0029` à `0031`.
+- [x] Suite d’intégration Supabase : 87 tests réussis dans 6 fichiers, contre la base locale.
+- [x] Suite unitaire : 200 tests réussis; lint, typecheck et build passent.
+- [x] Les identifiants distants présents dans `.env.test.local` n’ont pas été utilisés; les tests ont reçu temporairement les clés locales.
+- [x] Gestion des clés API Sphorix Connect : scopes, expiration, révocation et stockage par empreinte; migration `0031` appliquée localement.
+- [x] Pagination des erreurs de transfert par curseur, avec limite de 100 éléments par page.
+- [ ] `npm audit --omit=dev --audit-level=high` : 12 vulnérabilités, dont 7 élevées.
+- [ ] Playwright local toujours bloqué : `libnspr4.so` est absent.
+
 ## P0 - Bloquants de mise en production
 
 ### Secrets et configuration
@@ -168,3 +180,13 @@ La version peut être déclarée opérationnelle lorsque :
 - Vérifications : lint, typecheck, build et 191 tests Vitest réussis; 87 tests d’intégration ignorés faute de cible de test autorisée.
 - Bloqué : Docker n’est pas démarré; Playwright ne peut pas lancer Chromium sans `libnspr4.so`; l’audit npm relève 12 vulnérabilités, dont 7 élevées.
 - Reprise : démarrer Docker et Supabase local lors de la prochaine séance, appliquer les migrations sur cette base de test, relancer l’intégration; puis traiter les vulnérabilités et poursuivre les connecteurs, le snapshot multi-entités et les parcours de production Sadesk.
+
+## Point d’arrêt - 18 octobre 2026
+
+- Branche de travail : `feature/api` dans le dépôt Sadesk Compta; aucun changement applicatif ni commit effectué.
+- Docker et Supabase local Sadesk sont démarrés; l’instance Supabase précédente `lebondjassa` a été arrêtée avec ses volumes conservés. Son conteneur Postgres autonome sur le port `5433` est resté actif.
+- Migrations locales `0001` à `0031` appliquées; tests unitaires : 200/200 et tests d’intégration : 87/87 réussis.
+- `.env.test.local` contient toujours des variables Supabase générales distantes; les tests ont utilisé des variables `SUPABASE_TEST_*` temporaires et des clés locales.
+- Sphorix Connect : clés API limitées par scopes, empreinte SHA-256, expiration et révocation; erreurs de transfert paginées par curseur.
+- Prochaine étape produit : choisir un fournisseur pilote, vérifier sa documentation officielle et cadrer le périmètre source avant de développer l’adaptateur.
+- Qualité restante : traiter les vulnérabilités npm et installer `libnspr4` pour lancer Playwright.

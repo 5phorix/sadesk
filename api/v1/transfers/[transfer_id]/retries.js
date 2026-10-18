@@ -17,7 +17,7 @@ export default async function handler(request, response) {
   try {
     const originalRunId = request.query?.transfer_id;
     if (!isUuid(originalRunId)) throw new ApiError(400, 'INVALID_TRANSFER_ID', 'Identifiant d execution invalide.');
-    const context = await authorizeCompany(request, request.body?.company_id, EDIT_ROLES);
+    const context = await authorizeCompany(request, request.body?.company_id, EDIT_ROLES, { scope: 'transfers:retry' });
     const idempotencyKey = request.headers['idempotency-key'];
     if (typeof idempotencyKey !== 'string' || !IDEMPOTENCY_PATTERN.test(idempotencyKey)) {
       throw new ApiError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key doit contenir 8 a 128 caracteres autorises.');

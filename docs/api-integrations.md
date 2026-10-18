@@ -75,17 +75,19 @@ Les routes versionnees restent sous `/api/v1/` et repondent en JSON avec un `req
 
 - `GET /api/v1/connectors` : catalogue des connecteurs et capacites, sans exposer de secret.
 - `GET /api/v1/connections` et `POST /api/v1/connections` : lister et creer les connexions de l'entreprise autorisee.
+- `GET /api/v1/api-clients` et `POST /api/v1/api-clients` : lister et creer les cles API de l'entreprise; seule la creation retourne le secret brut.
+- `DELETE /api/v1/api-clients/{client_id}` : revoquer une cle API; reservation aux sessions owner/admin.
 - `POST /api/v1/connections/{connection_id}/test` : tester la connexion et ses capacites accessibles.
 - `POST /api/v1/uploads` : obtenir une URL signee pour un fichier CSV/JSON dans l'archive privee.
 - `POST /api/v1/transfer-previews` : analyser une source et retourner validations, correspondances, doublons et avertissements sans ecriture metier.
 - `POST /api/v1/transfers` : confirmer un apercu, creer une execution et retourner `202 Accepted`; le traitement long ne reste pas dans une requete HTTP synchrone.
 - `POST /api/v1/transfers/{transfer_id}/process` : traiter au plus 250 enregistrements et retourner `has_more`; l'appelant repete la requete jusqu'a l'etat terminal. Un lease en base empeche deux lots concurrents et expire pour autoriser la reprise apres panne.
-- `GET /api/v1/transfers/{transfer_id}` : statut, compteurs et erreurs lisibles.
-- `GET /api/v1/transfers/{transfer_id}/items` : resultat pagine par element.
+- `GET /api/v1/transfers/{transfer_id}` : statut, compteurs et premiere page de 100 erreurs; `next_cursor` indique si d'autres erreurs existent.
+- `GET /api/v1/transfers/{transfer_id}/items?limit=100&cursor=...` : erreurs `failed` et `unmapped` paginees par curseur; `limit` accepte de 1 a 100.
 - `POST /api/v1/transfers/{transfer_id}/retries` : creer une execution fille pour les seuls echecs classes recuperables; l'execution initiale reste inchangee.
 - `POST /api/v1/webhooks/{connector_id}` : recevoir les notifications fournisseur avec verification propre au connecteur.
 
-Les mutations exigent une authentification utilisateur ou fournisseur explicite, une autorisation sur l'entreprise et une validation stricte des entrees. Le serveur ne fait confiance ni au `company_id` seul fourni dans le corps, ni au seul `company_id` selectionne dans le navigateur.
+Les mutations exigent une session utilisateur ou une cle API explicitement autorisee, une autorisation sur l'entreprise et une validation stricte des entrees. Le serveur ne fait confiance ni au `company_id` seul fourni dans le corps, ni au seul `company_id` selectionne dans le navigateur.
 
 ### Exemple de contrat de transfert
 
@@ -145,6 +147,7 @@ Pour le connecteur fichier v1, l'appelant pilote les lots en repetant `POST /api
 ### Authentification par acteur
 
 - Utilisateur de Sadesk : jeton de session et role actif dans l'entreprise; l'entreprise est derivee et autorisee cote serveur.
+- Client API tiers : cle `spx_live_...` creee et revoquee par une session owner/admin, limitee a une entreprise, associee a un membre actif, expiree au plus tard apres 365 jours et autorisee par scopes (`connections:read/write`, `transfers:read/write/process/retry`, `uploads:write`). Seule l'empreinte SHA-256 est stockee; le secret brut n'est retourne qu'a la creation.
 - Connecteur fournisseur : secrets par connexion, jamais renvoyes apres creation ni stockes dans une configuration JSON lisible par les utilisateurs.
 - Webhook : signature ou mecanisme officiel, horodatage et identifiant d'evenement unique; echec de verification rejete avant toute mutation.
 - Client API tiers : identifiants scopes et revocables par entreprise; ne pas reutiliser la cle `service_role` Supabase comme cle d'API.

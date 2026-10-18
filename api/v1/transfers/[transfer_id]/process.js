@@ -22,7 +22,7 @@ export default async function handler(request, response) {
   try {
     const transferId = request.query?.transfer_id;
     if (!isUuid(transferId)) throw new ApiError(400, 'INVALID_TRANSFER_ID', 'Identifiant d execution invalide.');
-    context = await authorizeCompany(request, request.body?.company_id, EDIT_ROLES);
+    context = await authorizeCompany(request, request.body?.company_id, EDIT_ROLES, { scope: 'transfers:process' });
 
     const { data: foundRun, error: runError } = await context.adminClient
       .from('integration_runs')

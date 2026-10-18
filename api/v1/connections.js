@@ -21,6 +21,7 @@ export default async function handler(request, response) {
       request,
       companyId,
       request.method === 'GET' ? READ_ROLES : MANAGE_ROLES,
+      { scope: request.method === 'GET' ? 'connections:read' : 'connections:write' },
     );
 
     if (request.method === 'GET') {

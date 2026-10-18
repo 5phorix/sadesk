@@ -1,6 +1,7 @@
 import {
   ApiError,
   authorizeCompany,
+  encodeTransferItemsCursor,
   isUuid,
   methodNotAllowed,
   sendApiError,
@@ -14,7 +15,7 @@ export default async function handler(request, response) {
   try {
     const transferId = request.query?.transfer_id;
     if (!isUuid(transferId)) throw new ApiError(400, 'INVALID_TRANSFER_ID', 'Identifiant d execution invalide.');
-    const context = await authorizeCompany(request, request.query?.company_id, READ_ROLES);
+    const context = await authorizeCompany(request, request.query?.company_id, READ_ROLES, { scope: 'transfers:read' });
     const { data: transfer, error: transferError } = await context.adminClient
       .from('integration_runs')
       .select('id, connection_id, preview_id, direction, mode, status, total_count, read_count, written_count, ignored_count, failed_count, error_summary, created_at, started_at, completed_at')
@@ -36,13 +37,24 @@ export default async function handler(request, response) {
         .eq('run_id', transfer.id)
         .eq('company_id', context.companyId)
         .in('status', ['failed', 'unmapped'])
+        .order('object_type', { ascending: true })
         .order('record_number', { ascending: true })
-        .limit(100),
+        .limit(101),
     ]);
     if (scopesError) throw scopesError;
     if (itemsError) throw itemsError;
 
-    return response.status(200).json({ transfer, scopes: scopes || [], items: items || [] });
+    const pageItems = (items || []).slice(0, 100);
+    const nextCursor = items?.length > 100
+      ? encodeTransferItemsCursor(pageItems[pageItems.length - 1])
+      : null;
+
+    return response.status(200).json({
+      transfer,
+      scopes: scopes || [],
+      items: pageItems,
+      next_cursor: nextCursor,
+    });
   } catch (error) {
     return sendApiError(response, error);
   }

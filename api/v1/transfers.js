@@ -20,6 +20,7 @@ export default async function handler(request, response) {
         request,
         request.query?.company_id,
         READ_ROLES,
+        { scope: 'transfers:read' },
       );
       const { data, error } = await context.adminClient
         .from('integration_runs')
@@ -32,7 +33,7 @@ export default async function handler(request, response) {
     }
 
     const body = request.body || {};
-    const context = await authorizeCompany(request, body.company_id, EDIT_ROLES);
+    const context = await authorizeCompany(request, body.company_id, EDIT_ROLES, { scope: 'transfers:write' });
     const previewId = body.preview_id;
     const idempotencyKey = request.headers['idempotency-key'];
     if (!previewId) throw new ApiError(400, 'PREVIEW_REQUIRED', 'preview_id est obligatoire.');

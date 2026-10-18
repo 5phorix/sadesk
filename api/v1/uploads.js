@@ -22,7 +22,7 @@ export default async function handler(request, response) {
 
   try {
     const body = request.body || {};
-    const context = await authorizeCompany(request, body.company_id, EDIT_ROLES);
+    const context = await authorizeCompany(request, body.company_id, EDIT_ROLES, { scope: 'uploads:write' });
     const { connectionId, fileName, contentType, sizeBytes } = {
       connectionId: body.connection_id,
       fileName: typeof body.file_name === 'string' ? body.file_name.trim() : '',

@@ -17,7 +17,7 @@ export default async function handler(request, response) {
 
   try {
     const body = request.body || {};
-    const context = await authorizeCompany(request, body.company_id, EDIT_ROLES);
+    const context = await authorizeCompany(request, body.company_id, EDIT_ROLES, { scope: 'transfers:write' });
     const { connection_id: connectionId, source_path: sourcePath, object_type: objectType } = body;
 
     if (!connectionId || !sourcePath || !objectType) {

@@ -11,6 +11,7 @@ vi.mock('../../api/v1/_lib/sphorix-connect.js', () => ({
     }
   },
   authorizeCompany: authorizeCompanyMock,
+  encodeTransferItemsCursor: (item) => `${item.object_type}:${item.record_number}`,
   isUuid: (value) => typeof value === 'string' && value.length > 0,
   methodNotAllowed: vi.fn(),
   sendApiError: (response, error) => response.status(error.status || 500).json({
@@ -71,6 +72,7 @@ describe('detail des transferts Sphorix Connect', () => {
     expect(response.body.items).toEqual([{ status: 'failed', error_code: 'INVALID_AMOUNT' }]);
     expect(itemsQuery.eq).toHaveBeenCalledWith('company_id', 'company-1');
     expect(itemsQuery.in).toHaveBeenCalledWith('status', ['failed', 'unmapped']);
-    expect(itemsQuery.limit).toHaveBeenCalledWith(100);
+    expect(itemsQuery.limit).toHaveBeenCalledWith(101);
+    expect(response.body.next_cursor).toBeNull();
   });
 });
