@@ -56,6 +56,7 @@ export default function ThirdParties() {
   const [searchParams] = useSearchParams();
   const [formOpen, setFormOpen] = useState(false);
   const [selectedParty, setSelectedParty] = useState(null);
+  const [newClientName, setNewClientName] = useState('');
   const [deleteParty, setDeleteParty] = useState(null);
   const [filters, setFilters] = useState({
     search: '',
@@ -83,9 +84,14 @@ export default function ThirdParties() {
     setFormOpen(false);
     setSelectedParty(null);
     if (searchParams.get('new') === 'client' && savedParty?.id) {
-      const savedDocument = JSON.parse(sessionStorage.getItem('sadesk-sales-return') || 'null');
-      const resumeType = savedDocument?.type === 'invoice' ? 'invoice' : 'quote';
-      navigate(`/Invoices?tab=${resumeType === 'quote' ? 'quotes' : 'invoices'}&resume=${resumeType}&clientId=${encodeURIComponent(savedParty.id)}`);
+      try {
+        const savedDocument = JSON.parse(sessionStorage.getItem('sadesk-sales-return') || 'null');
+        const resumeType = savedDocument?.type === 'invoice' ? 'invoice' : 'quote';
+        navigate(`/Invoices?tab=${resumeType === 'quote' ? 'quotes' : 'invoices'}&resume=${resumeType}&clientId=${encodeURIComponent(savedParty.id)}`);
+      } catch (error) {
+        console.error('Unable to restore the sales document after client creation:', error);
+        toast.error('Le client est créé, mais le document en cours n’a pas pu être restauré.');
+      }
     }
   };
 
@@ -128,6 +134,13 @@ export default function ThirdParties() {
 
   React.useEffect(() => {
     if (searchParams.get('new') === 'client') {
+      try {
+        const savedDocument = JSON.parse(sessionStorage.getItem('sadesk-sales-return') || 'null');
+        setNewClientName(savedDocument?.clientName || '');
+      } catch (error) {
+        console.error('Unable to read the requested client name:', error);
+        setNewClientName('');
+      }
       setSelectedParty(null);
       setFormOpen(true);
     }
@@ -296,12 +309,19 @@ export default function ThirdParties() {
           setFormOpen(false);
           setSelectedParty(null);
           if (searchParams.get('new') === 'client') {
-            const savedDocument = JSON.parse(sessionStorage.getItem('sadesk-sales-return') || 'null');
-            const resumeType = savedDocument?.type === 'invoice' ? 'invoice' : 'quote';
-            navigate(`/Invoices?tab=${resumeType === 'quote' ? 'quotes' : 'invoices'}&resume=${resumeType}`);
+            try {
+              const savedDocument = JSON.parse(sessionStorage.getItem('sadesk-sales-return') || 'null');
+              const resumeType = savedDocument?.type === 'invoice' ? 'invoice' : 'quote';
+              navigate(`/Invoices?tab=${resumeType === 'quote' ? 'quotes' : 'invoices'}&resume=${resumeType}`);
+            } catch (error) {
+              console.error('Unable to return to the sales document:', error);
+              toast.error('Le document en cours n’a pas pu être restauré.');
+            }
           }
         }}
         thirdParty={selectedParty}
+        initialName={newClientName}
+        initialType="client"
         onSave={handleSave}
       />
 

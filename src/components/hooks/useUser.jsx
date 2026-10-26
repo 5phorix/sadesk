@@ -36,6 +36,12 @@ export function useUser() {
       const activeCompanyId = resolveActiveCompanyId(profile?.active_company_id, companyIds);
       const activeMembership = (memberships || []).find((membership) => membership.company_id === activeCompanyId);
 
+      let activeCompanyName = activeMembership?.company_name || null;
+      if (activeCompanyId && !activeCompanyName) {
+        const { data: company } = await supabase.from('companies').select('name').eq('id', activeCompanyId).maybeSingle();
+        activeCompanyName = company?.name || null;
+      }
+
       setUser({
         id: authUser.id,
         email: authUser.email,
@@ -43,7 +49,7 @@ export function useUser() {
         company_ids: companyIds,
         active_company_id: activeCompanyId,
         role: activeMembership?.role || null,
-        active_company_name: activeMembership?.company_name || null
+        active_company_name: activeCompanyName
       });
       setError(null);
     } catch (err) {

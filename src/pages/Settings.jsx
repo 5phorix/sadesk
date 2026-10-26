@@ -85,7 +85,8 @@ export default function Settings() {
     vat_regime: '',
     tax_regime: '',
     default_payment_terms: 30,
-    legal_mentions: ''
+    legal_mentions: '',
+    logo_url: ''
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -148,7 +149,8 @@ export default function Settings() {
         vat_regime: currentCompany.vat_regime || '',
         tax_regime: currentCompany.tax_regime || '',
         default_payment_terms: currentCompany.default_payment_terms ?? 30,
-        legal_mentions: currentCompany.legal_mentions || ''
+        legal_mentions: currentCompany.legal_mentions || '',
+        logo_url: currentCompany.logo_url || ''
       });
     }
   }, [currentCompany]);
@@ -169,6 +171,36 @@ export default function Settings() {
     toast.success('Affichage du tableau de bord réinitialisé');
   };
 
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  const handleLogoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Le logo doit être une image (PNG, JPG, SVG…).');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Le logo ne doit pas dépasser 2 Mo.');
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `${user.active_company_id}/logo-${crypto.randomUUID()}-${safeName}`;
+      const { error } = await supabase.storage.from('documents').upload(filePath, file, { upsert: false });
+      if (error) throw error;
+      const { data } = supabase.storage.from('documents').getPublicUrl(filePath);
+      setCompanyData((current) => ({ ...current, logo_url: data.publicUrl }));
+      toast.success('Logo ajouté : pensez à enregistrer les paramètres.');
+    } catch (error) {
+      toastSupabaseError(error, "Le logo n'a pas pu être téléversé.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   const handleSaveCompany = async () => {
     setSaving(true);
     try {
@@ -181,12 +213,14 @@ export default function Settings() {
         ...companyData,
         // Les colonnes contraintes n'acceptent pas la chaine vide.
         vat_regime: companyData.vat_regime || null,
+        logo_url: companyData.logo_url || null,
         default_payment_terms: Number(companyData.default_payment_terms) || null
       };
       const { error } = await supabase.from('companies').update(payload).eq('id', user.active_company_id);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['companies'] });
       queryClient.invalidateQueries({ queryKey: ['company', user.active_company_id] });
+      queryClient.invalidateQueries({ queryKey: ['company_logo', user.active_company_id] });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
       toast.success('Paramètres enregistrés');
@@ -354,6 +388,32 @@ export default function Settings() {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                {companyData.logo_url ? (
+                  <img src={companyData.logo_url} alt="Logo de la société" className="h-full w-full object-contain" />
+                ) : (
+                  <Building2 className="h-8 w-8 text-slate-400" aria-hidden="true" />
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Logo de la société</Label>
+                <p className="text-xs text-slate-500">Affiché en tête de chaque page. Image de 2 Mo maximum.</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" asChild disabled={uploadingLogo}>
+                    <label className="cursor-pointer">
+                      {uploadingLogo ? 'Téléversement…' : companyData.logo_url ? 'Changer le logo' : 'Ajouter un logo'}
+                      <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                    </label>
+                  </Button>
+                  {companyData.logo_url && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setCompanyData((d) => ({ ...d, logo_url: '' }))}>
+                      Retirer
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Raison sociale</Label>

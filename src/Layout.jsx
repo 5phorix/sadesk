@@ -102,7 +102,7 @@ export default function Layout({ children, currentPageName }) {
               <div className="flex flex-col">
                 <span className="font-semibold text-slate-800 text-sm">Sadesk</span>
                 {user?.active_company_name && (
-                  <span className="text-xs text-slate-500">{user.active_company_name}</span>
+                  <span className="text-sm font-medium text-slate-600">{user.active_company_name}</span>
                 )}
               </div>
             </div>
@@ -147,7 +147,7 @@ export default function Layout({ children, currentPageName }) {
                 <div className="flex flex-col min-w-0">
                   <span className="font-bold text-lg text-white tracking-tight">Sadesk</span>
                   {user?.active_company_name && (
-                    <span className="text-xs text-slate-300 truncate">{user.active_company_name}</span>
+                    <span className="text-sm font-medium text-slate-200 truncate">{user.active_company_name}</span>
                   )}
                 </div>
               )}
@@ -379,7 +379,7 @@ export default function Layout({ children, currentPageName }) {
                   </div>
                   <div className="hidden xl:flex flex-col items-start leading-tight">
                     <span className="text-sm font-semibold text-slate-800 truncate max-w-[140px]">{userDisplayName}</span>
-                    <span className="text-xs text-slate-500 truncate max-w-[140px]">{user?.active_company_name || 'Aucune société'}</span>
+                    <span className="text-sm font-medium text-slate-600 truncate max-w-[180px]">{user?.active_company_name || 'Aucune société'}</span>
                   </div>
                 </button>
               </DropdownMenuTrigger>

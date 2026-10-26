@@ -80,6 +80,21 @@ export default function Entries() {
 
   const queryClient = useQueryClient();
 
+  const { data: entries = [], isLoading } = useQuery({
+    queryKey: ['entries', user?.active_company_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('accounting_entries')
+        .select('*')
+        .eq('company_id', user.active_company_id)
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.active_company_id,
+    staleTime: 30000,
+  });
+
   React.useEffect(() => {
     const entryId = searchParams.get('id');
     if (entryId && !isLoading) {
@@ -105,21 +120,6 @@ export default function Entries() {
     nextParams.delete('search');
     setSearchParams(nextParams, { replace: true });
   }, [entries, isLoading, searchParams, setSearchParams]);
-
-  const { data: entries = [], isLoading } = useQuery({
-    queryKey: ['entries', user?.active_company_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('accounting_entries')
-        .select('*')
-        .eq('company_id', user.active_company_id)
-        .order('date', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.active_company_id,
-    staleTime: 30000,
-  });
 
   const { data: invoices = [] } = useQuery({
     queryKey: ['invoices', user?.active_company_id],

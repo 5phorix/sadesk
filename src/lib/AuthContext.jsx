@@ -71,6 +71,12 @@ export const AuthProvider = ({ children }) => {
         : null;
       const activeMembership = (memberships || []).find((membership) => membership.company_id === activeCompanyId);
 
+      let activeCompanyName = activeMembership?.company_name || null;
+      if (activeCompanyId && !activeCompanyName) {
+        const { data: company } = await supabase.from('companies').select('name').eq('id', activeCompanyId).maybeSingle();
+        activeCompanyName = company?.name || null;
+      }
+
       setUser({
         id: session.user.id,
         email: session.user.email,
@@ -78,7 +84,7 @@ export const AuthProvider = ({ children }) => {
         company_ids: companyIds,
         active_company_id: activeCompanyId,
         role: activeMembership?.role || null,
-        active_company_name: activeMembership?.company_name || null
+        active_company_name: activeCompanyName
       });
       setIsAuthenticated(true);
       setAuthError(null);

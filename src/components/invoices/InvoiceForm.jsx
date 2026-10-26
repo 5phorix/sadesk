@@ -22,6 +22,7 @@ import {
 import { Upload, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import ThirdPartyCombobox from '@/components/common/ThirdPartyCombobox';
 
 const TVA_RATES = [0, 5.5, 10, 20];
 
@@ -218,24 +219,25 @@ export default function InvoiceForm({ open, onClose, invoice, onSave, onCreateCl
           {/* Tiers */}
           <div className="space-y-2">
             <Label>{formData.type === 'client' ? 'Client' : 'Fournisseur'}</Label>
-            <Select value={formData.third_party_id} onValueChange={(v) => handleChange('third_party_id', v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner un tiers" />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredParties.map(party => (
-                  <SelectItem key={party.id} value={party.id}>
-                    {party.code} - {party.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             {formData.type === 'client' && (
-              <Button type="button" variant="link" className="h-auto p-0" onClick={() => onCreateClient?.(formData)}>
-                Créer un client dans le module Tiers
-              </Button>
+              <ThirdPartyCombobox
+                parties={filteredParties}
+                value={formData.third_party_id}
+                onSelect={(id) => handleChange('third_party_id', id)}
+                onCreate={(name) => onCreateClient?.({ ...formData, third_party_name: name }, name)}
+              />
             )}
-            {!formData.third_party_id && (
+            {formData.type !== 'client' && (
+              <Select value={formData.third_party_id} onValueChange={(v) => handleChange('third_party_id', v)}>
+                <SelectTrigger><SelectValue placeholder="Sélectionner un fournisseur" /></SelectTrigger>
+                <SelectContent>
+                  {filteredParties.map(party => (
+                    <SelectItem key={party.id} value={party.id}>{party.code} - {party.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {formData.type !== 'client' && !formData.third_party_id && (
               <Input
                 placeholder="Ou saisir le nom manuellement"
                 value={formData.third_party_name}

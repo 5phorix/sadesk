@@ -1,4 +1,7 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Building2 } from 'lucide-react';
+import { supabase } from '@/api/supabaseClient';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useUser } from '@/components/hooks/useUser';
@@ -11,15 +14,30 @@ export default function PageHeader({
   className 
 }) {
   const { user } = useUser();
+  const { data: company } = useQuery({
+    queryKey: ['company_logo', user?.active_company_id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('companies').select('logo_url').eq('id', user.active_company_id).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.active_company_id,
+    staleTime: 300000,
+  });
   const companyName = user?.active_company_name || 'Société active';
 
   return (
+    <>
+    <div className="mb-5 flex items-center justify-center gap-3 text-2xl font-extrabold uppercase tracking-wide text-[#f5871f] lg:text-3xl">
+      {company?.logo_url ? (
+        <img src={company.logo_url} alt="" className="h-10 w-10 rounded-lg object-contain lg:h-12 lg:w-12" />
+      ) : (
+        <Building2 className="h-8 w-8 text-[#142638] lg:h-9 lg:w-9" aria-hidden="true" />
+      )}
+      {companyName}
+    </div>
     <div className={cn("relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3 pb-3 mb-5 border-b border-slate-200", className)}>
       <div>
-        <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#f5871f]">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#f5871f]" />
-          {companyName}
-        </div>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-xl lg:text-2xl font-semibold text-[#142638] tracking-tight">
             {title}
@@ -42,5 +60,6 @@ export default function PageHeader({
         </div>
       )}
     </div>
+    </>
   );
 }

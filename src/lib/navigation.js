@@ -90,8 +90,11 @@ export const navSections = [
     items: [
       { name: 'Plan comptable', icon: BookOpen, page: 'Accounts' },
       { name: 'Écritures', icon: Receipt, page: 'Entries' },
-      { name: 'Journaux', icon: BookOpen, page: 'Journals' },
-      { name: 'Grand Livre et balance', icon: BarChart3, page: 'Reports' },
+      { name: 'Journaux par pièce', icon: BookOpen, page: 'Journals' },
+      { name: 'Journal général', icon: BookOpen, page: 'Reports', search: '?report=journal' },
+      { name: 'Grand livre', icon: BarChart3, page: 'Reports', search: '?report=ledger' },
+      { name: 'Balance générale', icon: Scale, page: 'Reports', search: '?report=balance' },
+      { name: 'Flux de trésorerie', icon: TrendingUp, page: 'Reports', search: '?report=cash_flow' },
       { name: 'Lettrage', icon: Link2, page: 'Lettering' },
       { name: 'Immobilisations', icon: Landmark, page: 'FixedAssets' },
       { name: 'Clôtures mensuelles', icon: CalendarCheck, page: 'MonthlyClosing' },

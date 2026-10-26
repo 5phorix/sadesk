@@ -19,6 +19,7 @@ import { TabsContent } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import ThirdPartyCombobox from '@/components/common/ThirdPartyCombobox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -258,11 +259,12 @@ export default function Invoices() {
     }
   }, [searchParams, setSearchParams, thirdParties, thirdPartiesLoading]);
 
-  const handleCreateClient = (type, draft) => {
+  const handleCreateClient = (type, draft, clientName = '') => {
     try {
       sessionStorage.setItem('sadesk-sales-return', JSON.stringify({
         type,
         draft,
+        clientName,
         sourceQuoteId: type === 'invoice' ? convertingQuoteId : null,
       }));
       navigate('/ThirdParties?new=client');
@@ -555,7 +557,7 @@ export default function Invoices() {
       <div>
       <PageHeader
         title={view === 'suppliers' ? 'Factures fournisseurs' : 'Ventes'}
-        subtitle={view === 'suppliers' ? 'Gestion des factures fournisseurs' : 'Devis et factures clients, en lien avec votre annuaire central des tiers'}
+        subtitle={view === 'suppliers' ? 'Gestion des factures fournisseurs' : 'Devis et factures clients'}
         actions={
           <>
             <Button
@@ -687,7 +689,7 @@ export default function Invoices() {
           <SheetHeader className="mb-6"><SheetTitle>{quoteDraft?.id ? 'Modifier le devis' : 'Nouveau devis'}</SheetTitle></SheetHeader>
           <form onSubmit={handleSaveQuote} className="space-y-5">
             <div className="space-y-2"><Label htmlFor="quote-number">Numéro du devis</Label><Input id="quote-number" required value={quoteDraft?.quote_number || ''} onChange={(event) => setQuoteDraft({ ...quoteDraft, quote_number: event.target.value })} /></div>
-            <div className="space-y-2"><Label htmlFor="quote-client">Client</Label><Select value={quoteDraft?.third_party_id || ''} onValueChange={(value) => setQuoteDraft({ ...quoteDraft, third_party_id: value })}><SelectTrigger id="quote-client"><SelectValue placeholder={thirdPartiesLoading ? 'Chargement des clients…' : 'Choisir un client'} /></SelectTrigger><SelectContent>{thirdParties.filter((party) => party.type === 'client' || party.type === 'les deux').map((party) => <SelectItem key={party.id} value={party.id}>{party.name}</SelectItem>)}</SelectContent></Select><Button type="button" variant="link" className="h-auto p-0" onClick={() => handleCreateClient('quote', quoteDraft)}>Créer un client dans le module Tiers</Button></div>
+            <div className="space-y-2"><Label htmlFor="quote-client">Client</Label><ThirdPartyCombobox parties={thirdParties.filter((party) => party.type === 'client' || party.type === 'les deux')} value={quoteDraft?.third_party_id || ''} onSelect={(third_party_id) => setQuoteDraft({ ...quoteDraft, third_party_id, third_party_name: thirdParties.find((party) => party.id === third_party_id)?.name || '' })} onCreate={(name) => handleCreateClient('quote', { ...quoteDraft, third_party_name: name }, name)} disabled={thirdPartiesLoading || thirdPartiesError} /></div>
             <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="quote-date">Date</Label><Input id="quote-date" type="date" required value={quoteDraft?.date || ''} onChange={(event) => setQuoteDraft({ ...quoteDraft, date: event.target.value })} /></div><div className="space-y-2"><Label htmlFor="quote-valid-until">Valide jusqu’au</Label><Input id="quote-valid-until" type="date" value={quoteDraft?.valid_until || ''} onChange={(event) => setQuoteDraft({ ...quoteDraft, valid_until: event.target.value })} /></div></div>
             <div className="space-y-2"><Label htmlFor="quote-description">Description</Label><Textarea id="quote-description" value={quoteDraft?.description || ''} onChange={(event) => setQuoteDraft({ ...quoteDraft, description: event.target.value })} /></div>
             <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="quote-amount">Montant HT</Label><Input id="quote-amount" type="number" min="0" step="0.01" required value={quoteDraft?.amount_ht || ''} onChange={(event) => setQuoteDraft({ ...quoteDraft, amount_ht: event.target.value })} /></div><div className="space-y-2"><Label htmlFor="quote-vat">TVA (%)</Label><Select value={quoteDraft?.tva_rate || '20'} onValueChange={(value) => setQuoteDraft({ ...quoteDraft, tva_rate: value })}><SelectTrigger id="quote-vat"><SelectValue /></SelectTrigger><SelectContent>{[0, 5.5, 10, 20].map((rate) => <SelectItem key={rate} value={String(rate)}>{rate} %</SelectItem>)}</SelectContent></Select></div></div>
@@ -703,7 +705,7 @@ export default function Invoices() {
         onClose={() => { setFormOpen(false); setSelectedInvoice(null); setConvertingQuoteId(null); }}
         invoice={selectedInvoice}
         initialType={view === 'suppliers' ? 'fournisseur' : 'client'}
-        onCreateClient={(draft) => handleCreateClient('invoice', draft)}
+        onCreateClient={(draft, name) => handleCreateClient('invoice', draft, name)}
         onSave={handleSave}
       />
 

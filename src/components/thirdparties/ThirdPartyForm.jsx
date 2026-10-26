@@ -22,7 +22,7 @@ import {
 import { Loader2, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function ThirdPartyForm({ open, onClose, thirdParty, onSave }) {
+export default function ThirdPartyForm({ open, onClose, thirdParty, onSave, initialName = '', initialType = 'client' }) {
   const { user } = useUser();
   const [formData, setFormData] = useState({
     code: '',
@@ -57,11 +57,11 @@ export default function ThirdPartyForm({ open, onClose, thirdParty, onSave }) {
     if (thirdParty) {
       setFormData(thirdParty);
     } else {
-      const prefix = formData.type === 'client' ? 'CLI' : 'FOU';
+      const prefix = initialType === 'client' ? 'CLI' : 'FOU';
       setFormData({
         code: `${prefix}-${Date.now().toString().slice(-5)}`,
-        type: 'client',
-        name: '',
+        type: initialType,
+        name: initialName,
         contact_name: '',
         email: '',
         additional_emails: [],
@@ -77,7 +77,7 @@ export default function ThirdPartyForm({ open, onClose, thirdParty, onSave }) {
         tva_number: '',
         legal_form: '',
         website: '',
-        account_code: '',
+        account_code: initialType === 'client' ? '411000' : '401000',
         payment_terms: 30,
         payment_method: '',
         bank_details: { iban: '', bic: '', bank_name: '' },
@@ -86,7 +86,7 @@ export default function ThirdPartyForm({ open, onClose, thirdParty, onSave }) {
         is_active: true
       });
     }
-  }, [thirdParty, open]);
+  }, [thirdParty, open, initialName, initialType]);
 
   const handleChange = (field, value) => {
     setFormData(prev => {
