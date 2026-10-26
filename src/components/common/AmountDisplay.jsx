@@ -35,7 +35,7 @@ const AmountDisplay = memo(function AmountDisplay({
 
   const sizes = {
     sm: 'text-sm',
-    default: 'text-base',
+    default: 'text-sm',
     lg: 'text-lg font-semibold',
     xl: 'text-xl font-bold'
   };
@@ -43,7 +43,7 @@ const AmountDisplay = memo(function AmountDisplay({
   return (
     <span className={cn(
       sizes[size],
-      "tabular-nums",
+      "tabular-nums whitespace-nowrap",
       showSign && (isPositive ? "text-emerald-600" : "text-red-600"),
       className
     )}>

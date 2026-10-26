@@ -5,9 +5,11 @@ import { toastSupabaseError } from '@/lib/supabase-errors';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@/components/hooks/useUser';
 import { useThirdParties } from '@/components/hooks/useCompanyData';
+import { buildScannedInvoiceEntries, updateScannedInvoice, validateScannedInvoice } from '@/lib/scanned-invoice';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import PageHeader from '../components/common/PageHeader';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Camera, Upload, FileText, CheckCircle2, Loader2 } from 'lucide-react';
@@ -26,6 +28,13 @@ export default function ScanInvoice() {
   const [creating, setCreating] = useState(false);
 
   const queryClient = useQueryClient();
+  const extractedDataError = extractedData ? validateScannedInvoice(extractedData) : null;
+
+  const updateExtractedField = (field, value) => {
+    const updated = updateScannedInvoice(extractedData, field, value);
+    setExtractedData(updated);
+    setEntries(buildScannedInvoiceEntries(updated, category));
+  };
 
   const categories = [
     { value: 'achats', label: 'Achats', icon: '🛒', journal: 'AC', accounts: { expense: '607000', vat: '445660', third: '401000' } },
@@ -251,122 +260,7 @@ RÈGLES TECHNIQUES STRICTES
         };
         
         setExtractedData(finalData);
-
-        // Générer les écritures comptables selon la catégorie
-        const cat = categories.find(c => c.value === category);
-        let invoiceEntries = [];
-
-        if (category === 'achats') {
-          const ht = Math.round((parseFloat(finalData.amount_ht) || 0) * 100) / 100;
-          const tva = Math.round((parseFloat(finalData.amount_tva) || 0) * 100) / 100;
-          const ttc = Math.round((parseFloat(finalData.amount_ttc) || 0) * 100) / 100;
-          
-          // ÉCRITURES PROFESSIONNELLES - ACHATS
-          invoiceEntries = [
-            {
-              date: finalData.date,
-              journal: cat.journal,
-              account_code: cat.accounts.expense,
-              account_label: 'Achats de marchandises',
-              label: `Fact. ${finalData.invoice_number} - ${finalData.supplier_name}${finalData.description ? ' - ' + finalData.description.substring(0, 50) : ''}`,
-              debit: ht,
-              credit: 0,
-              reference: finalData.invoice_number
-            },
-            {
-              date: finalData.date,
-              journal: cat.journal,
-              account_code: cat.accounts.vat,
-              account_label: `TVA déductible ${finalData.tva_rate}%`,
-              label: `TVA fact. ${finalData.invoice_number}`,
-              debit: tva,
-              credit: 0,
-              reference: finalData.invoice_number
-            },
-            {
-              date: finalData.date,
-              journal: cat.journal,
-              account_code: finalData.account_code || cat.accounts.third,
-              account_label: `Fournisseur - ${finalData.supplier_name}`,
-              label: `Fact. ${finalData.invoice_number} à payer`,
-              debit: 0,
-              credit: ttc,
-              reference: finalData.invoice_number,
-              third_party_name: finalData.supplier_name,
-              third_party_id: finalData.third_party_id
-            }
-          ];
-        } else if (category === 'ventes') {
-          const ht = Math.round((parseFloat(finalData.amount_ht) || 0) * 100) / 100;
-          const tva = Math.round((parseFloat(finalData.amount_tva) || 0) * 100) / 100;
-          const ttc = Math.round((parseFloat(finalData.amount_ttc) || 0) * 100) / 100;
-          
-          // ÉCRITURES PROFESSIONNELLES - VENTES
-          invoiceEntries = [
-            {
-              date: finalData.date,
-              journal: cat.journal,
-              account_code: finalData.account_code || cat.accounts.third,
-              account_label: `Client - ${finalData.supplier_name}`,
-              label: `Fact. ${finalData.invoice_number} à encaisser`,
-              debit: ttc,
-              credit: 0,
-              reference: finalData.invoice_number,
-              third_party_name: finalData.supplier_name,
-              third_party_id: finalData.third_party_id
-            },
-            {
-              date: finalData.date,
-              journal: cat.journal,
-              account_code: cat.accounts.revenue,
-              account_label: 'Ventes de marchandises',
-              label: `Fact. ${finalData.invoice_number} - ${finalData.supplier_name}${finalData.description ? ' - ' + finalData.description.substring(0, 50) : ''}`,
-              debit: 0,
-              credit: ht,
-              reference: finalData.invoice_number
-            },
-            {
-              date: finalData.date,
-              journal: cat.journal,
-              account_code: cat.accounts.vat,
-              account_label: `TVA collectée ${finalData.tva_rate}%`,
-              label: `TVA fact. ${finalData.invoice_number}`,
-              debit: 0,
-              credit: tva,
-              reference: finalData.invoice_number
-            }
-          ];
-        } else {
-          const ttc = Math.round((parseFloat(finalData.amount_ttc) || 0) * 100) / 100;
-          
-          // ÉCRITURES PROFESSIONNELLES - AUTRES OPÉRATIONS
-          invoiceEntries = [
-            {
-              date: finalData.date,
-              journal: cat.journal,
-              account_code: cat.accounts.expense || cat.accounts.bank,
-              account_label: cat.label,
-              label: `${finalData.supplier_name} - ${finalData.description || cat.label}`,
-              debit: ttc,
-              credit: 0,
-              reference: finalData.invoice_number
-            },
-            {
-              date: finalData.date,
-              journal: cat.journal,
-              account_code: finalData.account_code || cat.accounts.third || cat.accounts.bank,
-              account_label: finalData.supplier_name || 'Tiers',
-              label: `Règlement ${finalData.invoice_number}`,
-              debit: 0,
-              credit: ttc,
-              reference: finalData.invoice_number,
-              third_party_name: finalData.supplier_name,
-              third_party_id: finalData.third_party_id
-            }
-          ];
-        }
-
-        setEntries(invoiceEntries);
+        setEntries(buildScannedInvoiceEntries(finalData, category));
         
         if (matchedThirdParty) {
           toast.success(`Tiers reconnu automatiquement : ${matchedThirdParty.name}`);
@@ -385,6 +279,11 @@ RÈGLES TECHNIQUES STRICTES
 
   const handleCreateEntries = async () => {
     if (!extractedData || entries.length === 0) return;
+
+    if (extractedDataError) {
+      toast.error(extractedDataError);
+      return;
+    }
 
     // Vérification critique: utilisateur et société
     if (!user || !user.active_company_id) {
@@ -417,44 +316,34 @@ RÈGLES TECHNIQUES STRICTES
         return;
       }
 
-      // Créer la facture avec montants garantis
-      const { data: invoice, error: invoiceError } = await supabase
-        .from('invoices')
-        .insert({
+      const invoicePayload = {
           company_id: user.active_company_id,
           invoice_number: extractedData.invoice_number || `FACT-${Date.now()}`,
           type: category === 'ventes' ? 'client' : 'fournisseur',
           date: extractedData.date || format(new Date(), 'yyyy-MM-dd'),
-          due_date: extractedData.due_date || format(new Date(), 'yyyy-MM-dd'),
+          due_date: extractedData.due_date || null,
           third_party_name: extractedData.supplier_name || 'Fournisseur',
           third_party_id: extractedData.third_party_id,
           description: extractedData.description || '',
           amount_ht: parseFloat(extractedData.amount_ht) || 0,
-          tva_rate: parseFloat(extractedData.tva_rate) || 20,
+          tva_rate: Number(extractedData.tva_rate),
           amount_tva: parseFloat(extractedData.amount_tva) || 0,
           amount_ttc: parseFloat(extractedData.amount_ttc) || 0,
           status: 'brouillon',
           file_path: extractedData.file_path,
           file_url: extractedData.file_url
-        })
-        .select()
-        .single();
-      if (invoiceError) throw invoiceError;
-
-      // Créer les écritures comptables avec montants garantis numériques
-      const entryNumber = `${entries[0]?.journal || 'OD'}-${invoice.invoice_number}`;
-      const { error: entriesError } = await supabase.from('accounting_entries').insert(
-        entries.map((entry) => ({
+      };
+      const entriesPayload = entries.map((entry) => ({
           ...entry,
-          entry_number: entryNumber,
-          company_id: user.active_company_id,
-          invoice_id: invoice.id,
           debit: parseFloat(entry.debit) || 0,
           credit: parseFloat(entry.credit) || 0,
           is_validated: false
-        }))
-      );
-      if (entriesError) throw entriesError;
+      }));
+      const { error: createError } = await supabase.rpc('create_scanned_invoice_with_entries', {
+        target_invoice: invoicePayload,
+        target_entries: entriesPayload
+      });
+      if (createError) throw createError;
 
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['entries'] });
@@ -596,24 +485,20 @@ RÈGLES TECHNIQUES STRICTES
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <Label className="text-slate-500">N° Facture</Label>
-                      <p className="font-medium">{extractedData.invoice_number || '-'}</p>
+                      <Input value={extractedData.invoice_number || ''} onChange={(event) => updateExtractedField('invoice_number', event.target.value)} />
                     </div>
                     <div>
-                      <Label className="text-slate-500">Fournisseur</Label>
-                      <p className="font-medium">
-                        {extractedData.supplier_name || '-'}
-                        {extractedData.third_party_id && (
-                          <span className="ml-2 text-xs text-emerald-600">✓ Reconnu</span>
-                        )}
-                      </p>
+                      <Label className="text-slate-500">{category === 'ventes' ? 'Client' : 'Fournisseur'}</Label>
+                      <Input value={extractedData.supplier_name || ''} onChange={(event) => updateExtractedField('supplier_name', event.target.value)} />
+                      {extractedData.third_party_id && <span className="text-xs text-emerald-600">Tiers reconnu</span>}
                     </div>
                     <div>
                       <Label className="text-slate-500">Date</Label>
-                      <p className="font-medium">{extractedData.date || '-'}</p>
+                      <Input type="date" value={extractedData.date || ''} onChange={(event) => updateExtractedField('date', event.target.value)} />
                     </div>
                     <div>
                       <Label className="text-slate-500">Échéance</Label>
-                      <p className="font-medium">{extractedData.due_date || '-'}</p>
+                      <Input type="date" value={extractedData.due_date || ''} onChange={(event) => updateExtractedField('due_date', event.target.value || null)} />
                     </div>
                   </div>
 
@@ -621,25 +506,22 @@ RÈGLES TECHNIQUES STRICTES
                     <div className="grid grid-cols-3 gap-3 text-sm">
                       <div>
                         <Label className="text-slate-500">Montant HT</Label>
-                        <p className="font-semibold text-slate-800">
-                          {(extractedData.amount_ht || 0).toFixed(2)} €
-                        </p>
+                        <Input type="number" min="0" step="0.01" value={extractedData.amount_ht} onChange={(event) => updateExtractedField('amount_ht', event.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-slate-500">TVA ({extractedData.tva_rate}%)</Label>
-                        <p className="font-semibold text-slate-800">
-                          {(extractedData.amount_tva || 0).toFixed(2)} €
-                        </p>
+                        <Label className="text-slate-500">Taux TVA (%)</Label>
+                        <Input type="number" min="0" max="100" step="0.1" value={extractedData.tva_rate} onChange={(event) => updateExtractedField('tva_rate', event.target.value)} />
                       </div>
                       <div>
                         <Label className="text-slate-500">Total TTC</Label>
-                        <p className="font-bold text-lg text-[#1e3a5f]">
-                          {(extractedData.amount_ttc || 0).toFixed(2)} €
-                        </p>
+                        <p className="pt-2 font-bold text-lg text-[#1e3a5f]">{Number(extractedData.amount_ttc || 0).toFixed(2)} €</p>
                       </div>
                     </div>
+                    <p className="mt-2 text-sm text-slate-600">TVA calculée : {Number(extractedData.amount_tva || 0).toFixed(2)} €</p>
                   </div>
                 </div>
+
+                {extractedDataError && <p role="alert" className="text-sm text-red-700">{extractedDataError}</p>}
 
                 {extractedData.items && extractedData.items.length > 0 && (
                   <div className="space-y-2">
@@ -702,7 +584,7 @@ RÈGLES TECHNIQUES STRICTES
 
                     <Button
                       onClick={handleCreateEntries}
-                      disabled={creating}
+                      disabled={creating || Boolean(extractedDataError)}
                       className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:opacity-90"
                     >
                       {creating ? (

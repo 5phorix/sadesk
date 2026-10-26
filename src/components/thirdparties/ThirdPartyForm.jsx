@@ -20,6 +20,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Loader2, Plus, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function ThirdPartyForm({ open, onClose, thirdParty, onSave }) {
   const { user } = useUser();
@@ -115,13 +116,15 @@ export default function ThirdPartyForm({ open, onClose, thirdParty, onSave }) {
       if (thirdParty) {
         const { error } = await supabase.from('third_parties').update(dataToSave).eq('id', thirdParty.id);
         if (error) throw error;
+        onSave(thirdParty);
       } else {
-        const { error } = await supabase.from('third_parties').insert(dataToSave);
+        const { data, error } = await supabase.from('third_parties').insert(dataToSave).select('id, name, type').single();
         if (error) throw error;
+        onSave(data);
       }
-      onSave();
     } catch (error) {
       console.error('Save error:', error);
+      toast.error(error instanceof Error ? error.message : "Le tiers n'a pas pu être enregistré.");
     } finally {
       setSaving(false);
     }

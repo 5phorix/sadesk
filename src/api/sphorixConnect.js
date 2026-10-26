@@ -13,7 +13,7 @@ export async function requestSphorixConnect(path, {
   if (url.origin !== API_ORIGIN || !url.pathname.startsWith('/api/v1/')) {
     throw new Error('Route Sphorix Connect invalide.');
   }
-  if (method === 'GET' && companyId) url.searchParams.set('company_id', companyId);
+  if (['GET', 'DELETE'].includes(method) && companyId) url.searchParams.set('company_id', companyId);
 
   const headers = { Authorization: `Bearer ${token}` };
   const request = { method, headers };

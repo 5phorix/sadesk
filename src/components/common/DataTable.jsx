@@ -31,7 +31,7 @@ export default function DataTable({
 
   if (isLoading) {
     return (
-      <div className={cn("workspace-surface rounded-xl overflow-hidden", className)}>
+      <div className={cn("workspace-surface rounded-md overflow-hidden", className)}>
         <div className="overflow-x-auto">
         <Table className={tableClassName}>
           <TableHeader>
@@ -62,7 +62,7 @@ export default function DataTable({
 
   if (!data || data.length === 0) {
     return (
-      <div className={cn("workspace-surface rounded-xl p-12 text-center", className)}>
+      <div className={cn("workspace-surface rounded-md p-12 text-center", className)}>
         <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-orange-50 text-[#f5871f]">
           <Inbox className="h-5 w-5" />
         </div>
@@ -73,16 +73,16 @@ export default function DataTable({
   }
 
   return (
-    <div className={cn("workspace-surface rounded-xl overflow-hidden", className)}>
+    <div className={cn("workspace-surface rounded-md overflow-hidden", className)}>
       <div className="overflow-x-auto">
       <Table className={tableClassName}>
         <TableHeader>
-          <TableRow className="bg-slate-100/70 hover:bg-slate-100/70">
+          <TableRow className="bg-slate-100 hover:bg-slate-100 border-b-2 border-slate-300">
             {columns.map((col, i) => (
               <TableHead 
                 key={i} 
                 className={cn(
-                  "font-semibold text-slate-600 text-[10px] uppercase tracking-[0.12em]",
+                  "font-semibold text-slate-600 text-[11px] uppercase tracking-wider h-9 whitespace-nowrap",
                   col.className
                 )}
               >
@@ -100,13 +100,13 @@ export default function DataTable({
                 if (selectable) onRowSelect?.(row);
               }}
               className={cn(
-                "transition-colors border-b border-slate-100",
+                "transition-colors border-b border-slate-100 even:bg-slate-50/40",
                 (onRowClick || selectable) && "cursor-pointer hover:bg-slate-50",
                 selectedRowId && selectedRowId === row.id && "bg-orange-50 hover:bg-orange-50"
               )}
             >
               {columns.map((col, j) => (
-                <TableCell key={j} className={cn("py-3.5", col.cellClassName)}>
+                <TableCell key={j} className={cn("py-2 text-[13px] tabular-nums", col.cellClassName)}>
                   {col.render ? col.render(row) : row[col.accessor]}
                 </TableCell>
               ))}

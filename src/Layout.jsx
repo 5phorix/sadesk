@@ -1,48 +1,23 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { supabase } from '@/api/supabaseClient';
 import { useUser } from '@/components/hooks/useUser';
-import { 
-  LayoutDashboard, 
-  FileText, 
-  Users, 
-  BookOpen, 
-  BarChart3, 
-  Upload, 
-  Settings,
+import {
+  Building2,
   ChevronLeft,
   ChevronRight,
-  Receipt,
-  Building2,
-  Calculator,
-  Menu,
-  X,
-  Camera,
-  Search,
-  Waves,
-  Target,
-  Link2,
-  PieChart,
-  CalendarCheck,
-  Gauge,
-  Package,
-  Landmark,
-  FolderOpen,
-  Globe,
-  LogOut,
-  Shield,
-  Bell,
-  History,
-  CheckCircle2,
-  Lightbulb,
-  Scale,
   Compass,
-  Wallet,
-  LineChart,
-  TrendingUp,
-  CircleAlert
-} from 'lucide-react';import { cn } from '@/lib/utils';
+  Globe,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Search,
+  Settings,
+  X,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { navigationLabel, navSections } from '@/lib/navigation';
 import SearchCommand from '@/components/common/SearchCommand';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
@@ -54,113 +29,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-// Chaque module a une puce et un fin liseré colorés pour s'identifier une fois déplié,
-// sur un fond neutre épuré : l'orange de marque reste le seul élément saturé (état actif).
-const navSections = [
-  {
-    title: 'Comptabilité générale',
-    dotColor: 'bg-blue-400',
-    titleColor: 'text-blue-300',
-    accentBorder: 'border-l-4 border-l-blue-400',
-    items: [
-      { name: 'Plan comptable', icon: BookOpen, page: 'Accounts' },
-      { name: 'Écritures', icon: Receipt, page: 'Entries' },
-      { name: 'Journaux', icon: BookOpen, page: 'Journals' },
-      { name: 'Grand Livre & Balance', icon: BarChart3, page: 'Reports' },
-      { name: 'Lettrage', icon: Link2, page: 'Lettering' },
-      { name: 'Rapprochement bancaire', icon: Calculator, page: 'BankReconciliation' },
-      { name: 'Immobilisations', icon: Landmark, page: 'FixedAssets' },
-      { name: 'Clôtures mensuelles', icon: CalendarCheck, page: 'MonthlyClosing' },
-      { name: 'Bilan & compte de résultat', icon: Scale, page: 'FinancialStatements' },
-      { name: 'Contrôles comptables', icon: Shield, page: 'Controls' },
-    ]
-  },
-  {
-    title: 'Analyses et Agrégats',
-    dotColor: 'bg-teal-400',
-    titleColor: 'text-teal-300',
-    accentBorder: 'border-l-4 border-l-teal-400',
-    items: [
-      { name: 'Analyses et agrégats', icon: TrendingUp, page: 'AnalysesAgregats' },
-    ]
-  },
-  {
-    title: 'Facturation & Tiers',
-    dotColor: 'bg-violet-400',
-    titleColor: 'text-violet-300',
-    accentBorder: 'border-l-4 border-l-violet-400',
-    items: [
-      { name: 'Factures', icon: FileText, page: 'Invoices' },
-      { name: 'Scanner facture', icon: Camera, page: 'ScanInvoice' },
-      { name: 'Clients & Fournisseurs', icon: Building2, page: 'ThirdParties' },
-      { name: 'Créances & Relances', icon: CircleAlert, page: 'Receivables' },
-    ]
-  },
-  {
-    title: 'Trésorerie & Financement',
-    dotColor: 'bg-emerald-400',
-    titleColor: 'text-emerald-300',
-    accentBorder: 'border-l-4 border-l-emerald-400',
-    items: [
-      { name: 'Prévision de trésorerie', icon: Waves, page: 'CashForecast' },
-      { name: 'Gestion financière', icon: Wallet, page: 'FinancialManagement' },
-    ]
-  },
-  {
-    title: 'Pilotage & Performance',
-    dotColor: 'bg-indigo-400',
-    titleColor: 'text-indigo-300',
-    accentBorder: 'border-l-4 border-l-indigo-400',
-    items: [
-      { name: 'Analyser', icon: LineChart, page: 'Analysis' },
-      { name: 'Compta analytique', icon: Target, page: 'AnalyticalAccounting' },
-      { name: 'Calcul des coûts', icon: Calculator, page: 'Costing' },
-      { name: 'Rentabilité', icon: PieChart, page: 'Profitability' },
-      { name: 'Suivi budgétaire', icon: Gauge, page: 'BudgetTracking' },
-      { name: 'Indicateurs & KPI', icon: Gauge, page: 'Performance' },
-      { name: 'Aide à la décision', icon: Lightbulb, page: 'DecisionAssistant' },
-    ]
-  },
-  {
-    title: 'Stocks & Opérations',
-    dotColor: 'bg-cyan-400',
-    titleColor: 'text-cyan-300',
-    accentBorder: 'border-l-4 border-l-cyan-400',
-    items: [
-      { name: 'Gestion des stocks', icon: Package, page: 'StockManagement' },
-      { name: 'Documents & GED', icon: FolderOpen, page: 'Documents' },
-      { name: 'Tâches & Équipe', icon: CheckCircle2, page: 'Tasks' },
-    ]
-  },
-  {
-    title: 'Administration & Système',
-    dotColor: 'bg-slate-400',
-    titleColor: 'text-slate-300',
-    accentBorder: 'border-l-4 border-l-slate-400',
-    items: [
-      { name: 'Utilisateurs', icon: Users, page: 'CompanyUsers' },
-      { name: 'Rôles & Permissions', icon: Shield, page: 'RolesManagement' },
-      { name: "Journal d'audit", icon: History, page: 'AuditLog' },
-      { name: 'Import / Export FEC', icon: Upload, page: 'ImportExport' },
-      { name: 'Sauvegarde / Restauration', icon: History, page: 'BackupRestore' },
-      { name: 'Notifications', icon: Bell, page: 'NotificationSettings' },
-      { name: 'Paramètres', icon: Settings, page: 'Settings' },
-      { name: 'Guide & Documentation', icon: BookOpen, page: 'Documentation' },
-    ]
-  }
-];
-
-// Raccourcis des pages les plus utilisées, affichés dans la navbar horizontale
-const NAVBAR_LINKS = [
-  { name: 'Tableau de bord', page: 'Dashboard', icon: LayoutDashboard },
-  { name: 'Écritures', page: 'Entries', icon: Receipt },
-  { name: 'Factures', page: 'Invoices', icon: FileText },
-  { name: 'Trésorerie', page: 'CashForecast', icon: Waves },
-  { name: 'Performance', page: 'Performance', icon: Gauge },
-  { name: 'Stocks', page: 'StockManagement', icon: Package },
-];
-
 export default function Layout({ children, currentPageName }) {
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -170,10 +40,16 @@ export default function Layout({ children, currentPageName }) {
     const validTitles = navSections.map(s => s.title);
     const saved = localStorage.getItem('nav-section-open-v3');
     if (saved && validTitles.includes(saved)) return saved;
-    return validTitles[0];
+    return 'Collecte et imports';
   });
   
   const { user } = useUser();
+  const activeSection = navSections.find((section) => section.items.some((item) => item.page === currentPageName));
+  const activeItem = activeSection?.items.find((item) =>
+    item.page === currentPageName && item.search && location.search === item.search
+  ) || activeSection?.items.find((item) =>
+    item.page === currentPageName && !item.search
+  );
 
   // Ouvre automatiquement la section contenant la page en cours de visite
   React.useEffect(() => {
@@ -373,7 +249,7 @@ export default function Layout({ children, currentPageName }) {
                 <Compass className="h-4 w-4" />
               </div>
               {!collapsed && (
-                <span className="truncate">Liens rapides</span>
+                <span className="truncate">Tous les modules</span>
               )}
             </Link>
           </div>
@@ -395,16 +271,19 @@ export default function Layout({ children, currentPageName }) {
                   <button
                     type="button"
                     onClick={() => toggleSection(section.title)}
-                    className={cn(
-                      "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors text-slate-300 hover:bg-white/10"
-                    )}
+                    className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-left transition-colors hover:bg-white/10"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className={cn("w-2 h-2 rounded-full shrink-0 shadow-xs", section.dotColor)} />
-                      <span className={cn("truncate text-[11px]", section.titleColor)}>{section.title}</span>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border', section.iconTone)}>
+                        <section.icon className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className={cn('block truncate text-[10px] font-bold uppercase', section.titleColor)}>{section.title}</span>
+                        <span className="block truncate text-[9px] font-normal text-slate-400">{section.description}</span>
+                      </div>
                     </div>
                     <ChevronRight className={cn(
-                      "h-3.5 w-3.5 transition-transform shrink-0 opacity-70",
+                      'h-3.5 w-3.5 shrink-0 opacity-70 transition-transform',
                       isOpen && "rotate-90"
                     )} />
                   </button>
@@ -412,11 +291,12 @@ export default function Layout({ children, currentPageName }) {
                 {(collapsed || isOpen) && (
                   <div className="space-y-0.5 pt-0.5">
                     {section.items.map((item) => {
-                      const isActive = currentPageName === item.page;
+                      const isActive = currentPageName === item.page
+                        && (item.search ? location.search === item.search : !location.search);
                       return (
                         <Link
-                          key={item.page}
-                          to={createPageUrl(item.page)}
+                          key={`${item.page}${item.search || ''}`}
+                          to={`${createPageUrl(item.page)}${item.search || ''}`}
                           onClick={() => setMobileOpen(false)}
                           title={collapsed ? item.name : undefined}
                           className={cn(
@@ -467,27 +347,15 @@ export default function Layout({ children, currentPageName }) {
         collapsed ? "lg:ml-20" : "lg:ml-64",
         "pt-16 lg:pt-0"
       )}>
-        {/* Navbar desktop : liens rapides, recherche, notifications, utilisateur */}
+        {/* En-tête desktop : repère de section, recherche, notifications et compte */}
         <header className="hidden lg:flex sticky top-0 z-30 h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white/90 backdrop-blur px-6 xl:px-10">
-          <nav className="flex items-center gap-1 min-w-0 overflow-x-auto scrollbar-none">
-            {NAVBAR_LINKS.map((link) => {
-              const isActive = currentPageName === link.page;
-              return (
-                <Link
-                  key={link.page}
-                  to={createPageUrl(link.page)}
-                  className={cn(
-                    "relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap",
-                    isActive ? "text-[#142638]" : "text-slate-500 hover:text-[#142638] hover:bg-slate-100"
-                  )}
-                >
-                  <link.icon className="h-4 w-4" />
-                  {link.name}
-                  {isActive && <span className="absolute left-3 right-3 -bottom-[1px] h-0.5 rounded-full bg-[#f5871f]" />}
-                </Link>
-              );
-            })}
-          </nav>
+                    <div className="flex min-w-0 items-center gap-2 text-sm">
+            <span className="font-semibold text-[#142638]">Sadesk</span>
+            {activeSection && <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />}
+            {activeSection && <span className="truncate text-slate-500">{activeSection.title}</span>}
+            <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+            <span className="truncate font-medium text-[#142638]">{activeItem?.name || navigationLabel(currentPageName)}</span>
+          </div>
 
           <div className="flex items-center gap-3 shrink-0">
             <button

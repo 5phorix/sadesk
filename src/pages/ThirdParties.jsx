@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { 
@@ -51,6 +52,8 @@ import PaginationBar from '@/components/common/PaginationBar';
 
 export default function ThirdParties() {
   const { user } = useUser();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [formOpen, setFormOpen] = useState(false);
   const [selectedParty, setSelectedParty] = useState(null);
   const [deleteParty, setDeleteParty] = useState(null);
@@ -75,10 +78,15 @@ export default function ThirdParties() {
     enabled: !!user?.active_company_id
   });
 
-  const handleSave = () => {
+  const handleSave = (savedParty) => {
     queryClient.invalidateQueries({ queryKey: ['third-parties'] });
     setFormOpen(false);
     setSelectedParty(null);
+    if (searchParams.get('new') === 'client' && savedParty?.id) {
+      const savedDocument = JSON.parse(sessionStorage.getItem('sadesk-sales-return') || 'null');
+      const resumeType = savedDocument?.type === 'invoice' ? 'invoice' : 'quote';
+      navigate(`/Invoices?tab=${resumeType === 'quote' ? 'quotes' : 'invoices'}&resume=${resumeType}&clientId=${encodeURIComponent(savedParty.id)}`);
+    }
   };
 
   const handleDelete = async () => {
@@ -117,6 +125,13 @@ export default function ThirdParties() {
     setSelectedParty(null);
     setFormOpen(true);
   };
+
+  React.useEffect(() => {
+    if (searchParams.get('new') === 'client') {
+      setSelectedParty(null);
+      setFormOpen(true);
+    }
+  }, [searchParams]);
 
   const { paginatedItems: pagedParties, currentPage, totalPages, totalItems, goToPrevious, goToNext } = usePagination(filteredParties, 9);
 
@@ -277,7 +292,15 @@ export default function ThirdParties() {
       {/* Form Sheet */}
       <ThirdPartyForm
         open={formOpen}
-        onClose={() => { setFormOpen(false); setSelectedParty(null); }}
+        onClose={() => {
+          setFormOpen(false);
+          setSelectedParty(null);
+          if (searchParams.get('new') === 'client') {
+            const savedDocument = JSON.parse(sessionStorage.getItem('sadesk-sales-return') || 'null');
+            const resumeType = savedDocument?.type === 'invoice' ? 'invoice' : 'quote';
+            navigate(`/Invoices?tab=${resumeType === 'quote' ? 'quotes' : 'invoices'}&resume=${resumeType}`);
+          }
+        }}
         thirdParty={selectedParty}
         onSave={handleSave}
       />

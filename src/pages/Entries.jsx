@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
 import { toastSupabaseError } from '@/lib/supabase-errors';
 import { format, parseISO } from 'date-fns';
@@ -66,6 +67,7 @@ const JOURNAL_STYLES = {
 
 export default function Entries() {
   const { user, loading: loadingUser } = useUser();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [formOpen, setFormOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [deleteEntry, setDeleteEntry] = useState(null);
@@ -77,6 +79,32 @@ export default function Entries() {
   });
 
   const queryClient = useQueryClient();
+
+  React.useEffect(() => {
+    const entryId = searchParams.get('id');
+    if (entryId && !isLoading) {
+      const entry = entries.find((item) => item.id === entryId);
+      if (entry && entry.is_validated) {
+        setFilters((current) => ({ ...current, search: entry.label || entry.account_code || '' }));
+      } else if (entry) {
+        setSelectedEntry(entry);
+        setFormOpen(true);
+      }
+
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('id');
+      setSearchParams(nextParams, { replace: true });
+      return;
+    }
+
+    const search = searchParams.get('search');
+    if (!search) return;
+
+    setFilters((current) => ({ ...current, search }));
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('search');
+    setSearchParams(nextParams, { replace: true });
+  }, [entries, isLoading, searchParams, setSearchParams]);
 
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['entries', user?.active_company_id],

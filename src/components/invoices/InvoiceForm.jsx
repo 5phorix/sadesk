@@ -21,29 +21,33 @@ import {
 } from '@/components/ui/sheet';
 import { Upload, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 const TVA_RATES = [0, 5.5, 10, 20];
 
-export default function InvoiceForm({ open, onClose, invoice, onSave }) {
+const emptyInvoice = (type, invoiceNumber = '') => ({
+  invoice_number: invoiceNumber,
+  type,
+  date: format(new Date(), 'yyyy-MM-dd'),
+  due_date: '',
+  third_party_id: '',
+  third_party_name: '',
+  description: '',
+  amount_ht: 0,
+  tva_rate: 20,
+  amount_tva: 0,
+  amount_ttc: 0,
+  status: 'brouillon',
+  payment_method: '',
+  account_code: '',
+  notes: '',
+  file_url: '',
+});
+
+export default function InvoiceForm({ open, onClose, invoice, onSave, onCreateClient, initialType = 'client' }) {
   const { user } = useUser();
-  const [formData, setFormData] = useState({
-    invoice_number: '',
-    type: 'client',
-    date: format(new Date(), 'yyyy-MM-dd'),
-    due_date: '',
-    third_party_id: '',
-    third_party_name: '',
-    description: '',
-    amount_ht: 0,
-    tva_rate: 20,
-    amount_tva: 0,
-    amount_ttc: 0,
-    status: 'brouillon',
-    payment_method: '',
-    account_code: '',
-    notes: '',
-    file_url: ''
-  });
+  const isEditing = Boolean(invoice?.id);
+  const [formData, setFormData] = useState(() => emptyInvoice(initialType));
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -65,26 +69,9 @@ export default function InvoiceForm({ open, onClose, invoice, onSave }) {
     if (invoice) {
       setFormData(invoice);
     } else {
-      setFormData({
-        invoice_number: `FAC-${Date.now().toString().slice(-6)}`,
-        type: 'client',
-        date: format(new Date(), 'yyyy-MM-dd'),
-        due_date: '',
-        third_party_id: '',
-        third_party_name: '',
-        description: '',
-        amount_ht: 0,
-        tva_rate: 20,
-        amount_tva: 0,
-        amount_ttc: 0,
-        status: 'brouillon',
-        payment_method: '',
-        account_code: '',
-        notes: '',
-        file_url: ''
-      });
+      setFormData(emptyInvoice(initialType, `FAC-${Date.now().toString().slice(-6)}`));
     }
-  }, [invoice, open]);
+  }, [invoice, initialType, open]);
 
   const handleChange = (field, value) => {
     setFormData(prev => {
@@ -155,7 +142,7 @@ export default function InvoiceForm({ open, onClose, invoice, onSave }) {
       if (duplicateError) throw duplicateError;
       if (duplicate) throw new Error(`La facture ${data.invoice_number} existe déjà dans cette société.`);
       
-      if (invoice) {
+      if (isEditing) {
         const { error } = await supabase.from('invoices').update(data).eq('id', invoice.id);
         if (error) throw error;
       } else {
@@ -165,19 +152,20 @@ export default function InvoiceForm({ open, onClose, invoice, onSave }) {
       onSave();
     } catch (error) {
       console.error('Save error:', error);
+      toast.error(error instanceof Error ? error.message : "La facture n'a pas pu être enregistrée.");
     } finally {
       setSaving(false);
     }
   };
 
-  const filteredParties = thirdParties.filter(p => p.type === formData.type);
+  const filteredParties = thirdParties.filter(p => p.type === formData.type || p.type === 'les deux');
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
         <SheetHeader className="mb-6">
           <SheetTitle>
-            {invoice ? 'Modifier la facture' : 'Nouvelle facture'}
+            {isEditing ? 'Modifier la facture' : 'Nouvelle facture'}
           </SheetTitle>
         </SheetHeader>
 
@@ -242,6 +230,11 @@ export default function InvoiceForm({ open, onClose, invoice, onSave }) {
                 ))}
               </SelectContent>
             </Select>
+            {formData.type === 'client' && (
+              <Button type="button" variant="link" className="h-auto p-0" onClick={() => onCreateClient?.(formData)}>
+                Créer un client dans le module Tiers
+              </Button>
+            )}
             {!formData.third_party_id && (
               <Input
                 placeholder="Ou saisir le nom manuellement"

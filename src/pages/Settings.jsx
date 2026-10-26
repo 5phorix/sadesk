@@ -51,6 +51,7 @@ import { toast } from 'sonner';
 import { toastSupabaseError } from '@/lib/supabase-errors';
 import { cn } from '@/lib/utils';
 import { accountingPlanCurrencyError } from '@/lib/data-transfer';
+import SadeskIntegrationClientsPanel from '@/components/integrations/SadeskIntegrationClientsPanel';
 import {
   DEFAULT_DASHBOARD_PREFERENCES,
   loadDashboardPreferences,
@@ -301,6 +302,8 @@ export default function Settings() {
         title="Paramètres"
         subtitle={`Configuration de ${currentCompany?.name || 'votre société'}`}
       />
+
+      <SadeskIntegrationClientsPanel />
 
       <Card>
         <CardHeader>

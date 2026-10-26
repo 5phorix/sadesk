@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
 import { extractStructuredData, uploadDocument } from '@/api/aiClient';
 import { getSupabaseErrorMessage, toastSupabaseError } from '@/lib/supabase-errors';
@@ -60,10 +61,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import SphorixConnectPanel from '@/components/integrations/SphorixConnectPanel';
+import ApiClientsPanel from '@/components/integrations/ApiClientsPanel';
 
 export default function ImportExport() {
   const { user } = useUser();
   const [activeTab, setActiveTab] = useState('import');
+  const location = useLocation();
   const [category, setCategory] = useState(null);
   const [importType, setImportType] = useState('invoices');
   const [exportType, setExportType] = useState('invoices');
@@ -76,6 +79,10 @@ export default function ImportExport() {
   const [fecYear, setFecYear] = useState(new Date().getFullYear().toString());
 
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('tab') === 'connect') setActiveTab('connect');
+  }, [location.search]);
 
   const categories = [
     { value: 'achats', label: 'Achats', icon: '🛒' },
@@ -1232,7 +1239,16 @@ export default function ImportExport() {
         </TabsContent>
 
         <TabsContent value="connect" className="mt-6">
-          <SphorixConnectPanel />
+          <Tabs defaultValue="transfers" className="space-y-5">
+            <TabsList className="bg-white border border-slate-200">
+              <TabsTrigger value="transfers">Transferts</TabsTrigger>
+              {['owner', 'admin'].includes(user?.role) && <TabsTrigger value="api-clients">Clés API</TabsTrigger>}
+            </TabsList>
+            <TabsContent value="transfers"><SphorixConnectPanel /></TabsContent>
+            {['owner', 'admin'].includes(user?.role) && (
+              <TabsContent value="api-clients"><ApiClientsPanel /></TabsContent>
+            )}
+          </Tabs>
         </TabsContent>
         </Tabs>
 

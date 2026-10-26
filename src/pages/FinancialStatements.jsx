@@ -261,7 +261,7 @@ export default function FinancialStatements() {
             </Badge>
           </div>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300 lg:text-base">
-            Bilan complet multi-colonnes et compte de résultat officiel calculés à partir de vos comptes
+            Bilan complet multi-colonnes et compte de résultat calculés à partir de vos comptes (états de gestion, distincts de la liasse 2050-SD)
           </p>
         </div>
 
@@ -326,7 +326,7 @@ export default function FinancialStatements() {
           </TabsTrigger>
           <TabsTrigger value="compte_resultat" className="rounded-lg px-4 py-2.5 text-xs font-semibold data-[state=active]:bg-[#142638] data-[state=active]:text-white data-[state=active]:shadow-md">
             <FileSpreadsheet className="h-4 w-4 mr-1.5 text-blue-600" />
-            Compte de Résultat Officiel
+            Compte de Résultat
           </TabsTrigger>
         </TabsList>
 

@@ -54,8 +54,8 @@ export function getBearerToken(request) {
   return match?.[1]?.trim() || null;
 }
 
-export function createApiKey() {
-  const token = `${API_KEY_PREFIX}${randomBytes(32).toString('base64url')}`;
+export function createApiKey(prefix = API_KEY_PREFIX) {
+  const token = `${prefix}${randomBytes(32).toString('base64url')}`;
   return {
     token,
     tokenHash: createHash('sha256').update(token).digest('hex'),
@@ -83,13 +83,24 @@ export function createSupabaseClients(accessToken) {
   return { authClient, adminClient };
 }
 
-export async function authorizeCompany(request, companyId, allowedRoles, { scope, userOnly = false } = {}) {
-  if (!companyId) throw new ApiError(400, 'COMPANY_REQUIRED', 'company_id est obligatoire.');
-  if (!isUuid(companyId)) throw new ApiError(400, 'INVALID_COMPANY_ID', 'company_id est invalide.');
-
+export async function authorizeCompany(request, companyId, allowedRoles, {
+  scope,
+  userOnly = false,
+  deriveCompanyFromApiKey = false,
+  apiKeyPrefix = API_KEY_PREFIX,
+  apiClientTable = 'integration_api_clients',
+  servicePrincipal = false,
+} = {}) {
   const accessToken = getBearerToken(request);
   if (!accessToken) throw new ApiError(401, 'AUTHENTICATION_REQUIRED', 'Authentification requise.');
-  if (userOnly && accessToken.startsWith(API_KEY_PREFIX)) {
+  const isApiKey = accessToken.startsWith(apiKeyPrefix);
+  if (!companyId && !(deriveCompanyFromApiKey && isApiKey)) {
+    throw new ApiError(400, 'COMPANY_REQUIRED', 'company_id est obligatoire.');
+  }
+  if (companyId && !isUuid(companyId)) {
+    throw new ApiError(400, 'INVALID_COMPANY_ID', 'company_id est invalide.');
+  }
+  if (userOnly && isApiKey) {
     throw new ApiError(401, 'USER_SESSION_REQUIRED', 'Une session utilisateur est requise.');
   }
 
@@ -97,16 +108,16 @@ export async function authorizeCompany(request, companyId, allowedRoles, { scope
   let user;
   let apiClient = null;
 
-  if (accessToken.startsWith(API_KEY_PREFIX)) {
+  if (isApiKey) {
     if (!scope) throw new ApiError(403, 'API_SCOPE_REQUIRED', 'Cette operation n’est pas autorisee aux clients API.');
 
     const tokenHash = createHash('sha256').update(accessToken).digest('hex');
-    const { data: client, error: clientError } = await adminClient
-      .from('integration_api_clients')
+    let clientQuery = adminClient
+      .from(apiClientTable)
       .select('id, company_id, created_by, scopes, expires_at, revoked_at')
-      .eq('company_id', companyId)
-      .eq('token_hash', tokenHash)
-      .maybeSingle();
+      .eq('token_hash', tokenHash);
+    if (companyId) clientQuery = clientQuery.eq('company_id', companyId);
+    const { data: client, error: clientError } = await clientQuery.maybeSingle();
     if (clientError) throw clientError;
     if (!client || client.revoked_at || new Date(client.expires_at).getTime() <= Date.now()) {
       throw new ApiError(401, 'INVALID_API_KEY', 'Cle API invalide, expiree ou revoquee.');
@@ -115,8 +126,15 @@ export async function authorizeCompany(request, companyId, allowedRoles, { scope
       throw new ApiError(403, 'INSUFFICIENT_API_SCOPE', 'Le scope de cette cle API ne permet pas cette operation.');
     }
 
+    companyId ||= client.company_id;
     user = { id: client.created_by };
     apiClient = { id: client.id };
+    if (servicePrincipal) {
+      if (!allowedRoles.includes('integration')) {
+        throw new ApiError(403, 'INSUFFICIENT_ROLE', 'Le principal API ne permet pas cette operation.');
+      }
+      return { adminClient, user, role: 'integration', companyId, apiClient };
+    }
   } else {
     const { data, error: authError } = await authClient.auth.getUser();
     if (authError || !data?.user) {

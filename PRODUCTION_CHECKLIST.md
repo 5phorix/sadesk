@@ -2,6 +2,19 @@
 
 Cette checklist couvre les éléments restant à traiter avant de déclarer Sadesk Compta opérationnel en production.
 
+## Frontière Sadesk / Sphorix Connect
+
+- [ ] Commercialisation de Sadesk et Connect différée jusqu’à validation explicite des conceptions, parcours, sécurité, tests et exploitation; le modèle de vente sera défini à ce jalon, sans paiement ni tarification ajoutés avant.
+- [x] Définir le contrat de données et la propriété de chaque domaine dans le dépôt autonome `sphorix-connect`.
+- [x] Créer le socle API Connect et sa base Supabase locale distincte, avec organisations et authentification propres.
+- [x] Définir l’API publique d’import Sadesk et appliquer sa migration locale `0032`.
+- [x] Protéger l’API par credentials Sadesk `sds_live_...` scoped, expirables et liés à une seule société.
+- [x] API Sadesk publique testée en local pour lots idempotents, imports tiers/factures en brouillon et erreurs paginées.
+- [x] Ajouter l’écran Sadesk d’émission/révocation des credentials scoped dans les paramètres société.
+- [x] Porter le connecteur CSV/JSON et le moteur de transfert vers le dépôt Connect; tests réels 250+1 avec reprise.
+- [ ] Migrer les connexions et exécutions locales avec une procédure de retour arrière.
+- [ ] Retirer après bascule les routes, tables et écrans Connect de Sadesk; ne pas appliquer cette suppression en production avant validation de la bascule.
+
 ## Validation locale au 17 octobre 2026
 
 - [x] `npm run lint` passe.
@@ -17,14 +30,35 @@ Cette checklist couvre les éléments restant à traiter avant de déclarer Sade
 ## Validation locale au 18 octobre 2026
 
 - [x] Démarrer la stack Supabase locale de Sadesk; les conteneurs sont sains sur les ports `54321` à `54324`.
-- [x] Réinitialiser uniquement la base locale dédiée et appliquer les migrations `0001` à `0031`, dont `0029` à `0031`.
-- [x] Suite d’intégration Supabase : 87 tests réussis dans 6 fichiers, contre la base locale.
-- [x] Suite unitaire : 200 tests réussis; lint, typecheck et build passent.
+- [x] Réinitialiser uniquement la base locale dédiée et appliquer les migrations `0001` à `0032`, dont `0029` à `0032`.
+- [x] Suite d’intégration Supabase : 89 tests réussis dans 7 fichiers, contre la base locale.
+- [x] Suite unitaire : 211 tests réussis; lint, typecheck et build passent.
 - [x] Les identifiants distants présents dans `.env.test.local` n’ont pas été utilisés; les tests ont reçu temporairement les clés locales.
 - [x] Gestion des clés API Sphorix Connect : scopes, expiration, révocation et stockage par empreinte; migration `0031` appliquée localement.
 - [x] Pagination des erreurs de transfert par curseur, avec limite de 100 éléments par page.
+- [x] Écran de gestion des clés API accessible depuis la navigation Sphorix Connect, réservé aux propriétaires et administrateurs.
+- [x] Écran paramètres Sadesk pour émettre et révoquer les credentials `sds_live_...`; le secret brut n’est affiché qu’à la création.
 - [ ] `npm audit --omit=dev --audit-level=high` : 12 vulnérabilités, dont 7 élevées.
 - [ ] Playwright local toujours bloqué : `libnspr4.so` est absent.
+
+## Validation locale au 19 octobre 2026
+
+- [x] Corriger la clé React du menu Sphorix Connect, qui partageait la clé `ImportExport` avec l’entrée Import / Export FEC.
+- [x] Vérifier les 45 routes enregistrées : les 77 références des menus et raccourcis pointent vers une page existante.
+- [x] Suite unitaire : 211 tests réussis; lint, typecheck et build validés après mise à jour des dépendances.
+- [x] `npm audit --omit=dev --audit-level=high` : aucune vulnérabilité de production détectée; `tailwindcss-animate` est réservé aux dépendances de développement.
+- [ ] Tests d’intégration non exécutés : les 89 tests ont été ignorés faute de cible Supabase de test configurée dans cette session.
+- [ ] Tests Playwright bloqués avant chargement de l’application : Chromium ne démarre pas car `libnspr4.so` est absent.
+- [ ] L’audit incluant les dépendances de développement signale encore 9 vulnérabilités (6 élevées, 3 modérées), dont des dépendances Tailwind sans correctif disponible.
+- [x] Scan facture : champs extraits corrigibles avant création; contrôle des montants et des dates.
+- [x] Préserver l’absence d’échéance, gérer la TVA à 0 % sans ligne comptable nulle et maintenir l’équilibre des écritures générées.
+- [x] Suite unitaire après amélioration du scan : 217 tests réussis; lint ciblé, typecheck et build validés.
+- [x] Implémenter la création atomique de la facture scannée et de ses écritures via une fonction SQL transactionnelle.
+- [ ] Appliquer la migration locale `0033` et exécuter le test d’intégration qui vérifie le succès et le rollback.
+- [x] Unifier sidebar et catalogue autour des mêmes pôles, avec couleurs et icônes cohérentes; toutes les destinations sont couvertes par des tests.
+- [x] La recherche globale ouvre directement la facture ou le tiers sélectionné; elle respecte la société active et ouvre les écritures en brouillon.
+- [x] Suite unitaire après refonte navigation/recherche : 221 tests réussis; lint, typecheck et build validés.
+- [ ] Parcours visuel authentifié non vérifié : l’aperçu n’a pas de session de démonstration disponible.
 
 ## P0 - Bloquants de mise en production
 
@@ -190,3 +224,11 @@ La version peut être déclarée opérationnelle lorsque :
 - Sphorix Connect : clés API limitées par scopes, empreinte SHA-256, expiration et révocation; erreurs de transfert paginées par curseur.
 - Prochaine étape produit : choisir un fournisseur pilote, vérifier sa documentation officielle et cadrer le périmètre source avant de développer l’adaptateur.
 - Qualité restante : traiter les vulnérabilités npm et installer `libnspr4` pour lancer Playwright.
+
+## Point d’arrêt - 20 octobre 2026
+
+- Vérifications locales : 221 tests unitaires réussis; lint, typecheck et build réussis.
+- Les 91 tests d’intégration sont ignorés, car aucune cible Supabase de test n’est configurée dans cette session.
+- Docker n’est pas accessible dans le WSL courant; Supabase local et la recette authentifiée restent à faire. Aucun environnement distant n’a été utilisé.
+- Ajout de la migration `0033_scanned_invoice_atomic_create.sql`, utilisée par le scan pour créer facture et écritures dans une même transaction; le test de succès et de rollback est ajouté mais non exécuté contre PostgreSQL.
+- Étape suivante : rétablir Docker, appliquer les migrations sur Supabase locale isolée, puis exécuter les 91 tests d’intégration et contrôler la fonction de transaction.

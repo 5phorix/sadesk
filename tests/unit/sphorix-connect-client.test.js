@@ -42,6 +42,22 @@ describe('client API Sphorix Connect', () => {
     }));
   });
 
+  it('inclut la société dans la route de révocation d une clé API', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ revoked: true }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await requestSphorixConnect('/api/v1/api-clients/client-1', {
+      token: 'access-token',
+      companyId: 'company-1',
+      method: 'DELETE',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/api-clients/client-1?company_id=company-1', {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer access-token' },
+    });
+  });
+
   it('retourne un message serveur et refuse une route externe', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: false,

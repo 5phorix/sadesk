@@ -14,14 +14,14 @@ export default function PageHeader({
   const companyName = user?.active_company_name || 'Société active';
 
   return (
-    <div className={cn("relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5 pb-5 mb-7 border-b border-slate-200", className)}>
+    <div className={cn("relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3 pb-3 mb-5 border-b border-slate-200", className)}>
       <div>
-        <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#f5871f]">
+        <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#f5871f]">
           <span className="h-1.5 w-1.5 rounded-full bg-[#f5871f]" />
           {companyName}
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl lg:text-4xl font-semibold text-[#142638] tracking-[-0.03em]">
+          <h1 className="text-xl lg:text-2xl font-semibold text-[#142638] tracking-tight">
             {title}
           </h1>
           {badge && (
@@ -31,7 +31,7 @@ export default function PageHeader({
           )}
         </div>
         {subtitle && (
-          <p className="text-slate-500 mt-2 text-sm lg:text-base">
+          <p className="text-slate-500 mt-1 text-sm">
             {subtitle}
           </p>
         )}

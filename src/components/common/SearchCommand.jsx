@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { useUser } from '@/components/hooks/useUser';
 import { useNavigate } from 'react-router-dom';
-import { createPageUrl } from '@/utils';
+import { searchResultUrl } from '@/lib/navigation';
 import {
   CommandDialog,
   CommandEmpty,
@@ -20,19 +20,19 @@ export default function SearchCommand({ open, onOpenChange }) {
   const { user } = useUser();
 
   const { data: invoices = [] } = useQuery({
-    queryKey: ['invoices'],
+    queryKey: ['search-invoices', user?.active_company_id],
     queryFn: async () => { const { data, error } = await supabase.from('invoices').select('*').eq('company_id', user.active_company_id).order('date', { ascending: false }).limit(100); if (error) throw error; return data; },
     enabled: open && !!user?.active_company_id,
   });
 
   const { data: thirdParties = [] } = useQuery({
-    queryKey: ['third-parties'],
+    queryKey: ['search-third-parties', user?.active_company_id],
     queryFn: async () => { const { data, error } = await supabase.from('third_parties').select('*').eq('company_id', user.active_company_id).order('name'); if (error) throw error; return data; },
     enabled: open && !!user?.active_company_id,
   });
 
   const { data: entries = [] } = useQuery({
-    queryKey: ['entries'],
+    queryKey: ['search-entries', user?.active_company_id],
     queryFn: async () => { const { data, error } = await supabase.from('accounting_entries').select('*').eq('company_id', user.active_company_id).order('date', { ascending: false }).limit(100); if (error) throw error; return data; },
     enabled: open && !!user?.active_company_id,
   });
@@ -66,13 +66,7 @@ export default function SearchCommand({ open, onOpenChange }) {
 
   const handleSelect = (type, item) => {
     onOpenChange(false);
-    if (type === 'invoice') {
-      navigate(createPageUrl('Invoices'));
-    } else if (type === 'thirdparty') {
-      navigate(createPageUrl('ThirdParties'));
-    } else if (type === 'entry') {
-      navigate(createPageUrl('Entries'));
-    }
+    navigate(searchResultUrl(type, item));
   };
 
   return (

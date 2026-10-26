@@ -153,4 +153,50 @@ describe('authentification Sphorix Connect', () => {
     )).rejects.toMatchObject({ status: 401, code: 'USER_SESSION_REQUIRED' });
     expect(createClientSpy).not.toHaveBeenCalled();
   });
+
+  it('derive la societe d une cle Sadesk dediee sans membership utilisateur', async () => {
+    const clientQuery = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: {
+          id: 'sadesk-client-1',
+          company_id: '123e4567-e89b-12d3-a456-426614174001',
+          created_by: 'user-1',
+          scopes: ['imports:write'],
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+          revoked_at: null,
+        },
+        error: null,
+      }),
+    };
+    clientQuery.select.mockReturnValue(clientQuery);
+    clientQuery.eq.mockReturnValue(clientQuery);
+    const adminClient = { from: vi.fn(() => clientQuery) };
+    const authClient = { auth: { getUser: vi.fn() } };
+    createClientMock.mockReturnValueOnce(authClient).mockReturnValueOnce(adminClient);
+
+    const context = await authorizeCompany(
+      { headers: { authorization: 'Bearer sds_live_dedicated-key' } },
+      undefined,
+      ['integration'],
+      {
+        scope: 'imports:write',
+        deriveCompanyFromApiKey: true,
+        apiKeyPrefix: 'sds_live_',
+        apiClientTable: 'sadesk_api_clients',
+        servicePrincipal: true,
+      },
+    );
+
+    expect(context).toMatchObject({
+      companyId: '123e4567-e89b-12d3-a456-426614174001',
+      role: 'integration',
+      apiClient: { id: 'sadesk-client-1' },
+    });
+    expect(adminClient.from).toHaveBeenCalledTimes(1);
+    expect(adminClient.from).toHaveBeenCalledWith('sadesk_api_clients');
+    expect(clientQuery.eq).toHaveBeenCalledWith('token_hash', expect.any(String));
+    expect(authClient.auth.getUser).not.toHaveBeenCalled();
+  });
 });

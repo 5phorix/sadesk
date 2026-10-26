@@ -1,5 +1,7 @@
 # Sphorix Connect — API d'integration
 
+> Document historique de l'implementation initialement integree a Sadesk. Le contrat du produit autonome est maintenant dans le depot `sphorix-connect/docs/product-contract.md`; l'API destination Sadesk est decrite dans `docs/sadesk-public-integration-api.md`. Ne pas traiter les tables `integration_*` ci-dessous comme le schema cible de Connect.
+
 ## Objectif
 
 Connecter progressivement Sadesk Compta aux logiciels et plateformes cites dans la liste de reference `Sphorix-france/docs/liste_pa_attente_rapport_audit.pdf`, sans promettre un connecteur par nom commercial avant verification de son interface technique. Cette liste identifie des fournisseurs, pas leurs protocoles, leurs API disponibles ou leurs conditions d'acces. Son statut et sa date doivent etre verifies avant toute communication commerciale.
